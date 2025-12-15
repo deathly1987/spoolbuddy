@@ -299,7 +299,7 @@ class PrinterConnection:
             client.subscribe(topic)
             logger.info(f"Subscribed to {topic}")
 
-            # Fetch calibrations for all nozzle sizes (like SpoolEase does)
+            # Fetch calibrations for all nozzle sizes
             for nozzle_diameter in ["0.2", "0.4", "0.6", "0.8"]:
                 self._fetch_calibrations(nozzle_diameter)
 

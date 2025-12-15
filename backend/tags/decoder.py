@@ -10,7 +10,7 @@ from .models import (
     TagReadResult,
     SpoolFromTag,
 )
-from .spoolease import SpoolEaseDecoder
+from .spoolease_format import SpoolEaseDecoder
 from .bambulab import BambuLabDecoder
 from .openprinttag import OpenPrintTagDecoder
 

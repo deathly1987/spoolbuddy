@@ -1,7 +1,6 @@
 # SpoolBuddy - Project Plan
 
 > A smart filament management system for Bambu Lab 3D printers.
-> Inspired by [SpoolEase](https://github.com/yanshay/SpoolEase) - built from scratch.
 
 ---
 
@@ -13,7 +12,7 @@
 4. [Software Components](#software-components)
 5. [Development Phases](#development-phases)
 6. [Technical Details](#technical-details)
-7. [Upstream Sync Strategy](#upstream-sync-strategy)
+7. [Feature Comparison Checklist](#feature-comparison-checklist)
 
 ---
 
@@ -27,18 +26,17 @@ SpoolBuddy is a reimagined filament management system that combines:
 - **Inventory management** - Track all your spools, usage, and K-profiles
 - **Automatic printer configuration** - Auto-configure AMS slots via MQTT
 
-### Key Differences from SpoolEase
+### Architecture Design
 
-| Aspect | SpoolEase | SpoolBuddy |
-|--------|-----------|--------------|
-| Architecture | Standalone embedded | Server + ESP32 Device |
-| Device | ESP32-S3 + 3.5" (480×320) | ESP32-S3 + 4.3" (800×480) |
-| Console + Scale | Separate devices | Combined unit |
-| Device UI | Slint (embedded) | LVGL (embedded) |
-| Web UI | Embedded web server | Dedicated server (Preact) |
-| Database | CSV on SD card | SQLite on server |
-| NFC Reader | PN532 (~5cm range) | PN5180 (~20cm range) |
-| Codebase | Reference only | Built from scratch |
+| Aspect | Choice |
+|--------|--------|
+| Architecture | Server + ESP32 Device |
+| Display | ESP32-S3 + 4.3" (800×480) |
+| Console + Scale | Combined unit |
+| Device UI | LVGL (embedded) |
+| Web UI | Dedicated server (Preact) |
+| Database | SQLite on server |
+| NFC Reader | PN5180 (~20cm range) |
 
 ### Goals
 
@@ -206,7 +204,7 @@ backend/
 │   ├── client.py
 │   └── bambu_api.rs  # Message structures
 └── tags/             # NFC tag encoding/decoding
-    ├── spoolease.py
+    ├── spoolease_format.py
     ├── bambulab.py
     └── openprinttag.py
 ```
@@ -576,7 +574,7 @@ spoolbuddy/
 │       ├── __init__.py
 │       ├── models.py
 │       ├── decoder.py
-│       ├── spoolease.py
+│       ├── spoolease_format.py
 │       ├── bambulab.py
 │       └── openprinttag.py
 │
@@ -617,6 +615,193 @@ spoolbuddy/
 
 ---
 
+## Feature Comparison Checklist
+
+> Reference checklist for filament management system features.
+> Use this to track implementation progress and identify gaps.
+
+### Backend - BambuPrinter Module (`core/src/bambu.rs`)
+
+**Printer State Management:**
+| Function | Description | SpoolBuddy Status |
+|----------|-------------|-------------------|
+| `nozzle_type_code()` | Determine nozzle type (Standard/HighFlow) | ❌ Missing |
+| `printer_name()` / `set_printer_name()` | Get/set printer display name | ✅ Implemented |
+| `is_locked()` | Check printer locked mode | ❌ Missing |
+| `model()` / `model_series()` | Get printer model/series | ⚠️ Partial |
+| `get_extruder()` | Retrieve extruder config by ID | ✅ Implemented |
+| `num_extruders()` | Get extruder count | ⚠️ Hardcoded |
+
+**AMS Tray Management:**
+| Function | Description | SpoolBuddy Status |
+|----------|-------------|-------------------|
+| `ams_trays()` | Get all AMS tray slots | ✅ Implemented |
+| `virt_trays()` | Get virtual/external trays | ✅ Implemented |
+| `swap_ams_tray()` | Exchange tray at index | ❌ Missing |
+| `update_ams_tray()` / `update_virt_tray()` | Modify tray with callback | ✅ Implemented |
+| `get_any_tray()` | Retrieve any tray by unified index | ✅ Implemented |
+| `reset_tray()` | Clear/reset tray data | ✅ Implemented |
+| `set_tray_filament()` | Load filament into tray | ✅ Implemented |
+
+**AMS Status Bitmaps:**
+| Function | Description | SpoolBuddy Status |
+|----------|-------------|-------------------|
+| `ams_exist_bits()` / `set_ams_exist_bits()` | AMS existence bitmap | ❌ Missing |
+| `tray_exist_bits()` / `set_tray_exist_bits()` | Tray existence bitmap | ❌ Missing |
+| `tray_read_done_bits()` | Tray RFID read completion | ❌ Missing |
+
+**Calibration (K-value):**
+| Function | Description | SpoolBuddy Status |
+|----------|-------------|-------------------|
+| `add_calibration_to_printer()` | Store calibration for filament | ⚠️ Partial (fetches only) |
+| `get_matching_printer_calibration_for_extruder()` | Find matching K value | ✅ Implemented |
+| `fetch_filament_calibrations()` | Request K values from printer | ✅ Implemented |
+| `get_tray_resolved_k_value()` | Get K value with calibration lookup | ✅ Implemented |
+
+**MQTT Message Processing:**
+| Function | Description | SpoolBuddy Status |
+|----------|-------------|-------------------|
+| `process_print_message()` | Main entry for all messages | ✅ Implemented |
+| `process_print_message__ams()` | Process AMS tray updates | ✅ Implemented |
+| `process_print_message__vt_tray()` | Process virtual tray updates | ✅ Implemented |
+| `process_print_message__ams_filament_setting()` | Process filament settings | ✅ Implemented |
+| `process_print_message__extrusion_cali_sel()` | Process calibration selection | ✅ Implemented |
+| `process_print_message__extrusion_cali_get()` | Process calibration retrieval | ✅ Implemented |
+
+**Active Tray Tracking:**
+| Function | Description | SpoolBuddy Status |
+|----------|-------------|-------------------|
+| `get_active_extruder()` | Get currently active extruder | ⚠️ Partial |
+| `get_tray_active()` | Get current active tray | ✅ Implemented |
+| `get_common_tray_active()` | Determine active tray | ✅ Implemented |
+
+**Printer Control:**
+| Function | Description | SpoolBuddy Status |
+|----------|-------------|-------------------|
+| `publish_payload()` | Send MQTT command | ✅ Implemented |
+| `request_full_update_sync/async()` | Request full printer status | ✅ Implemented |
+| `request_version_info_async()` | Request firmware version | ❌ Missing |
+| `reset_printer()` | Clear all printer state | ❌ Missing |
+
+**Persistence:**
+| Function | Description | SpoolBuddy Status |
+|----------|-------------|-------------------|
+| `load_printer_state()` | Load saved state | ❌ Missing |
+| `store_printer_state()` | Save state to storage | ❌ Missing |
+
+### Backend - Store/Database (`core/src/store.rs`, `csvdb.rs`)
+
+| Function | Description | SpoolBuddy Status |
+|----------|-------------|-------------------|
+| `get_spool_by_id()` | Retrieve spool by ID | ✅ Implemented |
+| `get_spool_by_tag_id()` | Find spool by NFC tag | ✅ Implemented |
+| `add_spool()` | Create new spool | ✅ Implemented |
+| `update_spool()` | Modify spool | ✅ Implemented |
+| `delete_spool()` | Remove spool | ✅ Implemented |
+| `list_spools()` | Get all spools | ✅ Implemented |
+
+### Backend - Scale Integration (`core/src/spool_scale.rs`)
+
+| Function | Description | SpoolBuddy Status |
+|----------|-------------|-------------------|
+| `on_scale_loaded()` | Scale reads weight | ⏳ Pending (firmware) |
+| `on_scale_load_changed_stable()` | Stable weight reading | ⏳ Pending (firmware) |
+| `on_scale_load_changed_unstable()` | Unstable reading | ⏳ Pending (firmware) |
+| `on_scale_load_removed()` | Filament removed | ⏳ Pending (firmware) |
+| `on_scale_connected/disconnected()` | Scale connectivity | ⏳ Pending (firmware) |
+| `calibrate()` | Calibrate scale | ⏳ Pending (firmware) |
+| `read_tag()` | Trigger NFC read | ⏳ Pending (firmware) |
+| `write_tag()` | Write NFC tag | ⏳ Pending (firmware) |
+| `erase_tag()` | Clear NFC tag | ⏳ Pending (firmware) |
+| `emulate_tag()` | Create virtual tag | ❌ N/A |
+| `request_gcode_analysis()` | Request filament usage calc | ❌ Missing |
+
+### Backend - Gcode Analysis (`shared/src/gcode_analysis.rs`)
+
+| Function | Description | SpoolBuddy Status |
+|----------|-------------|-------------------|
+| `new()` | Create analyzer | ❌ Missing |
+| `set_bbl_info()` | Set Bambu metadata | ❌ Missing |
+| `add_buffer()` | Feed gcode chunks | ❌ Missing |
+| `process_available_buffer()` | Parse buffered data | ❌ Missing |
+| `done()` | Finalize analysis | ❌ Missing |
+| `gram_from_length()` | Calculate weight from length | ❌ Missing |
+| `fetch_gcode_analysis_task()` | Background analysis task | ❌ Missing |
+
+### Backend - NFC/Tag (`shared/src/nfc.rs`, `spool_tag.rs`, `ndef.rs`)
+
+| Function | Description | SpoolBuddy Status |
+|----------|-------------|-------------------|
+| `read_bambulab_payload()` | Read Bambu tag | ✅ Implemented (decoder) |
+| `read_ndef_payload()` | Read generic NDEF | ✅ Implemented (decoder) |
+| `write_ndef_url_record()` | Write URL to tag | ⏳ Pending (firmware) |
+| `erase_ndef_tag()` | Clear tag | ⏳ Pending (firmware) |
+| `get_nfc_tag_type()` | Identify tag type | ✅ Implemented |
+| `to_tag_descriptor_v2()` | Generate NFC URL encoding | ✅ Implemented |
+
+### Backend - Other Modules
+
+**SSDP Discovery (`ssdp.rs`):**
+| Function | Description | SpoolBuddy Status |
+|----------|-------------|-------------------|
+| `ssdp_task()` | Listen for printer announcements | ❌ Missing |
+
+**OTA Updates (`app_ota.rs`):**
+| Function | Description | SpoolBuddy Status |
+|----------|-------------|-------------------|
+| `app_ota_task()` | Check/perform firmware updates | ❌ N/A (web app) |
+
+**FTP Client (`my_ftp.rs`):**
+| Function | Description | SpoolBuddy Status |
+|----------|-------------|-------------------|
+| `connect()`, `login()`, `retrieve()` | Download files from printer | ❌ Missing |
+
+**Color Utils (`color_utils.rs`):**
+| Function | Description | SpoolBuddy Status |
+|----------|-------------|-------------------|
+| `get_color_name()` | RGB to named color | ❌ Missing |
+| `perceptual_distance()` | Color distance calculation | ❌ Missing |
+
+### Feature Status Summary
+
+| Feature | Status | Priority |
+|---------|--------|----------|
+| **Printer MQTT** | ✅ Full | - |
+| **AMS tray management** | ✅ Full | - |
+| **K-value calibration** | ✅ Full | - |
+| **Spool CRUD** | ✅ SQLite | - |
+| **Usage tracking** | ✅ Via AMS remain% | - |
+| **Spool-to-slot assignments** | ✅ Persistent | - |
+| **Usage history logging** | ✅ Implemented | - |
+| **NFC tag read/write** | ⏳ Pending (firmware) | High |
+| **Scale integration** | ⏳ Pending (firmware) | High |
+| **Gcode analysis** | ❌ Missing | Medium |
+| **SSDP printer discovery** | ❌ Missing | Low |
+| **Printer state persistence** | ❌ Missing | Low |
+| **Multi-extruder support** | ⚠️ Partial | Medium |
+| **Locked printer mode** | ❌ Missing | Low |
+| **Color name lookup** | ❌ Missing | Low |
+
+### Priority Implementation List
+
+**High Priority (Core Functionality):**
+1. NFC tag reading (PN5180 driver in firmware)
+2. Scale integration (HX711 driver in firmware)
+3. WebSocket device communication
+
+**Medium Priority (Enhanced Features):**
+4. Gcode analysis for pre-print filament estimation
+5. Multi-extruder support improvements
+6. FTP client for printer file access
+
+**Low Priority (Nice to Have):**
+7. SSDP printer auto-discovery
+8. Printer state persistence across restarts
+9. Color name lookup from RGB
+10. Locked printer mode handling
+
+---
+
 ## Next Steps
 
 **Current:** Phase 3 - Device Firmware
@@ -632,4 +817,3 @@ spoolbuddy/
 
 *Document created: December 2024*
 *Last updated: December 2024*
-*Inspired by SpoolEase - built from scratch*

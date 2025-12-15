@@ -13,7 +13,7 @@ from .models import (
     BambuLabTagData,
     OpenPrintTagData,
 )
-from .spoolease import SpoolEaseDecoder, SpoolEaseEncoder
+from .spoolease_format import SpoolEaseDecoder, SpoolEaseEncoder
 from .bambulab import BambuLabDecoder
 from .openprinttag import OpenPrintTagDecoder
 from .decoder import TagDecoder
