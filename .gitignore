@@ -46,3 +46,10 @@ Thumbs.db
 # Screenshots (reference only, don't commit large assets)
 screenshots/OrcaSlicer/
 screenshots/ha-bambulab-cards/
+
+# Rust / Firmware
+firmware/target/
+Cargo.lock
+
+# Misc artifacts
+=*
