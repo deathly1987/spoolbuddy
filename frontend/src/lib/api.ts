@@ -138,6 +138,47 @@ export interface DiscoveredPrinter {
   model: string | null;
 }
 
+// Update API types
+export interface VersionInfo {
+  version: string;
+  git_commit: string | null;
+  git_branch: string | null;
+}
+
+export interface UpdateCheck {
+  current_version: string;
+  latest_version: string | null;
+  update_available: boolean;
+  release_notes: string | null;
+  release_url: string | null;
+  published_at: string | null;
+  error: string | null;
+}
+
+export interface UpdateStatus {
+  status: "idle" | "checking" | "downloading" | "applying" | "restarting" | "error";
+  message: string | null;
+  progress: number | null;
+  error: string | null;
+}
+
+export interface FirmwareVersion {
+  version: string;
+  filename: string;
+  size: number | null;
+  checksum: string | null;
+  url: string | null;
+}
+
+export interface FirmwareCheck {
+  current_version: string | null;
+  latest_version: string | null;
+  update_available: boolean;
+  download_url: string | null;
+  release_notes: string | null;
+  error: string | null;
+}
+
 class ApiClient {
   private async request<T>(
     path: string,
@@ -357,6 +398,47 @@ class ApiClient {
 
   async getFilamentPresets(): Promise<SlicerPreset[]> {
     return this.request<SlicerPreset[]>("/cloud/filaments");
+  }
+
+  // Updates API
+  async getVersion(): Promise<VersionInfo> {
+    return this.request<VersionInfo>("/updates/version");
+  }
+
+  async checkForUpdates(force: boolean = false): Promise<UpdateCheck> {
+    const query = force ? "?force=true" : "";
+    return this.request<UpdateCheck>(`/updates/check${query}`);
+  }
+
+  async applyUpdate(version?: string): Promise<UpdateStatus> {
+    return this.request<UpdateStatus>("/updates/apply", {
+      method: "POST",
+      body: JSON.stringify({ version }),
+    });
+  }
+
+  async getUpdateStatus(): Promise<UpdateStatus> {
+    return this.request<UpdateStatus>("/updates/status");
+  }
+
+  async resetUpdateStatus(): Promise<UpdateStatus> {
+    return this.request<UpdateStatus>("/updates/reset-status", {
+      method: "POST",
+    });
+  }
+
+  // Firmware API
+  async getFirmwareVersions(): Promise<FirmwareVersion[]> {
+    return this.request<FirmwareVersion[]>("/firmware/version");
+  }
+
+  async getLatestFirmware(): Promise<FirmwareVersion> {
+    return this.request<FirmwareVersion>("/firmware/latest");
+  }
+
+  async checkFirmwareUpdate(currentVersion?: string): Promise<FirmwareCheck> {
+    const query = currentVersion ? `?current_version=${encodeURIComponent(currentVersion)}` : "";
+    return this.request<FirmwareCheck>(`/firmware/check${query}`);
   }
 }
 

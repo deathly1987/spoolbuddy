@@ -2,6 +2,13 @@ from pydantic_settings import BaseSettings
 from pathlib import Path
 
 
+# Application version - update this for each release
+APP_VERSION = "0.1.0"
+
+# GitHub repository for update checks
+GITHUB_REPO = "maziggy/SpoolBuddy"
+
+
 class Settings(BaseSettings):
     """Application settings with environment variable support."""
 
@@ -14,6 +21,9 @@ class Settings(BaseSettings):
 
     # Static files (frontend)
     static_dir: Path = Path("../frontend/dist")
+
+    # Project root (for git operations)
+    project_root: Path = Path(__file__).parent.parent
 
     class Config:
         env_prefix = "SPOOLBUDDY_"

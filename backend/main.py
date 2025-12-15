@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from db import get_db
 from mqtt import PrinterManager
-from api import spools_router, printers_router
+from api import spools_router, printers_router, updates_router, firmware_router
 from api.printers import set_printer_manager
 from api.cloud import router as cloud_router
 from models import PrinterState
@@ -199,6 +199,8 @@ app.add_middleware(
 app.include_router(spools_router, prefix="/api")
 app.include_router(printers_router, prefix="/api")
 app.include_router(cloud_router, prefix="/api")
+app.include_router(updates_router, prefix="/api")
+app.include_router(firmware_router, prefix="/api")
 
 
 async def handle_tag_detected(websocket: WebSocket, message: dict):

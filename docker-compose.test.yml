@@ -1,0 +1,22 @@
+services:
+  backend-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      target: backend-test
+    volumes:
+      - ./backend:/app
+    environment:
+      TESTING: "1"
+      SPOOLBUDDY_DATABASE_PATH: ":memory:"
+    command: ["pytest", "tests/", "-v", "--tb=short", "-p", "no:cacheprovider"]
+
+  frontend-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      target: frontend-test
+    volumes:
+      - ./frontend:/app/frontend
+      - /app/frontend/node_modules
+    command: ["npm", "test", "--", "--run"]

@@ -1,0 +1,13 @@
+services:
+  spoolbuddy:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - spoolbuddy-data:/app/data
+    environment:
+      SPOOLBUDDY_DATABASE_PATH: /app/data/spoolbuddy.db
+    restart: unless-stopped
+
+volumes:
+  spoolbuddy-data:
