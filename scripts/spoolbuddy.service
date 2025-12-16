@@ -1,0 +1,36 @@
+[Unit]
+Description=SpoolBuddy Filament Management System
+Documentation=https://github.com/your-repo/spoolbuddy
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=spoolbuddy
+Group=spoolbuddy
+WorkingDirectory=/opt/spoolbuddy/backend
+Environment=PATH=/opt/spoolbuddy/backend/venv/bin:/usr/local/bin:/usr/bin
+Environment=SPOOLBUDDY_DATABASE_PATH=/var/lib/spoolbuddy/spoolbuddy.db
+Environment=SPOOLBUDDY_HOST=0.0.0.0
+Environment=SPOOLBUDDY_PORT=3000
+
+ExecStart=/opt/spoolbuddy/backend/venv/bin/python main.py
+
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=spoolbuddy
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/spoolbuddy
+
+# Allow serial device access
+SupplementaryGroups=dialout
+
+[Install]
+WantedBy=multi-user.target

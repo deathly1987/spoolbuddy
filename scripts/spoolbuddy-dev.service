@@ -1,0 +1,27 @@
+[Unit]
+Description=SpoolBuddy Development Server (Backend only)
+After=network.target
+
+[Service]
+Type=simple
+# Change this to your username
+User=claude
+Group=claude
+WorkingDirectory=/opt/claude/projects/SpoolStation/backend
+
+Environment=PATH=/opt/claude/projects/SpoolStation/backend/venv/bin:/usr/local/bin:/usr/bin
+Environment=SPOOLBUDDY_HOST=0.0.0.0
+Environment=SPOOLBUDDY_PORT=3000
+ExecStart=/opt/claude/projects/SpoolStation/backend/venv/bin/python main.py
+
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=spoolbuddy-dev
+
+# Allow serial device access
+SupplementaryGroups=dialout
+
+[Install]
+WantedBy=multi-user.target

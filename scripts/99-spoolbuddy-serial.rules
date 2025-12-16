@@ -1,0 +1,20 @@
+# SpoolBuddy udev rules for USB serial devices
+# Install: sudo cp 99-spoolbuddy-serial.rules /etc/udev/rules.d/
+# Reload: sudo udevadm control --reload-rules && sudo udevadm trigger
+
+# ESP32 devices (ttyACM* - CDC ACM class)
+SUBSYSTEM=="tty", KERNEL=="ttyACM*", GROUP="dialout", MODE="0660"
+
+# USB-to-Serial adapters (ttyUSB* - FTDI, CH340, CP210x, etc.)
+SUBSYSTEM=="tty", KERNEL=="ttyUSB*", GROUP="dialout", MODE="0660"
+
+# Specific ESP32-S3 USB JTAG/serial (Espressif VID)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="303a", GROUP="dialout", MODE="0660"
+
+# Common USB-serial chips
+# CH340/CH341
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", GROUP="dialout", MODE="0660"
+# CP210x
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", GROUP="dialout", MODE="0660"
+# FTDI
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", GROUP="dialout", MODE="0660"

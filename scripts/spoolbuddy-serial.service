@@ -1,0 +1,12 @@
+[Unit]
+Description=Fix serial device permissions for SpoolBuddy
+After=dev-ttyUSB0.device dev-ttyACM0.device
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'chown root:dialout /dev/ttyUSB* /dev/ttyACM* 2>/dev/null || true'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

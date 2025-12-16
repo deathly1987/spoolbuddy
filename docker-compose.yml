@@ -5,8 +5,15 @@ services:
       - "3000:3000"
     volumes:
       - spoolbuddy-data:/app/data
+      # Mount /dev for dynamic serial device access
+      - /dev:/dev
     environment:
       SPOOLBUDDY_DATABASE_PATH: /app/data/spoolbuddy.db
+    # Run as dialout group for serial device access
+    group_add:
+      - dialout
+    # Required for serial device access
+    privileged: true
     restart: unless-stopped
 
 volumes:

@@ -179,6 +179,42 @@ export interface FirmwareCheck {
   error: string | null;
 }
 
+// ESP32 Device Connection types
+export interface ESP32DeviceInfo {
+  ip: string;
+  hostname: string | null;
+  mac_address: string | null;
+  firmware_version: string | null;
+  nfc_status: boolean | null;
+  scale_status: boolean | null;
+  uptime: number | null;
+  last_seen: string | null;
+}
+
+export interface ESP32DeviceConfig {
+  ip: string;
+  port: number;
+  name: string | null;
+}
+
+export interface ESP32ConnectionStatus {
+  connected: boolean;
+  device: ESP32DeviceInfo | null;
+  last_error: string | null;
+  reconnect_attempts: number;
+}
+
+export interface ESP32DiscoveryResult {
+  devices: ESP32DeviceInfo[];
+  scan_duration_ms: number;
+}
+
+export interface ESP32RecoveryInfo {
+  steps: string[];
+  serial_commands: Record<string, string>;
+  firmware_url: string | null;
+}
+
 class ApiClient {
   private async request<T>(
     path: string,
@@ -439,6 +475,63 @@ class ApiClient {
   async checkFirmwareUpdate(currentVersion?: string): Promise<FirmwareCheck> {
     const query = currentVersion ? `?current_version=${encodeURIComponent(currentVersion)}` : "";
     return this.request<FirmwareCheck>(`/firmware/check${query}`);
+  }
+
+  // ESP32 Device Connection API
+  async getESP32Status(): Promise<ESP32ConnectionStatus> {
+    return this.request<ESP32ConnectionStatus>("/device/status");
+  }
+
+  async getESP32Config(): Promise<ESP32DeviceConfig | null> {
+    return this.request<ESP32DeviceConfig | null>("/device/config");
+  }
+
+  async saveESP32Config(config: ESP32DeviceConfig): Promise<ESP32DeviceConfig> {
+    return this.request<ESP32DeviceConfig>("/device/config", {
+      method: "POST",
+      body: JSON.stringify(config),
+    });
+  }
+
+  async connectESP32(config?: ESP32DeviceConfig): Promise<ESP32ConnectionStatus> {
+    return this.request<ESP32ConnectionStatus>("/device/connect", {
+      method: "POST",
+      body: config ? JSON.stringify(config) : undefined,
+    });
+  }
+
+  async disconnectESP32(): Promise<void> {
+    return this.request<void>("/device/disconnect", {
+      method: "POST",
+    });
+  }
+
+  async discoverESP32Devices(timeoutMs: number = 3000): Promise<ESP32DiscoveryResult> {
+    return this.request<ESP32DiscoveryResult>(`/device/discover?timeout_ms=${timeoutMs}`, {
+      method: "POST",
+    });
+  }
+
+  async pingESP32(ip: string, port: number = 80): Promise<{ reachable: boolean; device: ESP32DeviceInfo | null }> {
+    return this.request<{ reachable: boolean; device: ESP32DeviceInfo | null }>(`/device/ping?ip=${encodeURIComponent(ip)}&port=${port}`, {
+      method: "POST",
+    });
+  }
+
+  async rebootESP32(): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>("/device/reboot", {
+      method: "POST",
+    });
+  }
+
+  async factoryResetESP32(): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>("/device/factory-reset", {
+      method: "POST",
+    });
+  }
+
+  async getESP32RecoveryInfo(): Promise<ESP32RecoveryInfo> {
+    return this.request<ESP32RecoveryInfo>("/device/recovery-info");
   }
 }
 
