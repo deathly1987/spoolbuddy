@@ -2571,7 +2571,10 @@ unsafe fn create_ams_unit_visual(parent: *mut lvgl_sys::lv_obj_t, x: i16, y: i16
         if *color != 0 {
             lvgl_sys::lv_obj_set_style_bg_color(slot, lv_color_hex(*color), 0);
         } else {
-            lvgl_sys::lv_obj_set_style_bg_color(slot, lv_color_hex(0x3D3D3D), 0);
+            // Empty slot - striped background
+            lvgl_sys::lv_obj_set_style_bg_color(slot, lv_color_hex(0x2A2A2A), 0);
+            // Add diagonal stripes using line objects
+            draw_diagonal_stripes(slot, 36, 0x404040);
         }
 
         if *selected {
@@ -2602,6 +2605,56 @@ unsafe fn create_ams_unit_visual(parent: *mut lvgl_sys::lv_obj_t, x: i16, y: i16
     }
 }
 
+/// Helper: Draw diagonal stripes on an object (for empty 36x36 slots)
+unsafe fn draw_diagonal_stripes(parent: *mut lvgl_sys::lv_obj_t, _size: i16, stripe_color: u32) {
+    // Create several diagonal line strips
+    static mut LINE_POINTS: [[lvgl_sys::lv_point_t; 2]; 5] = [[lvgl_sys::lv_point_t { x: 0, y: 0 }; 2]; 5];
+
+    // Define stripe positions (diagonal lines from top-left to bottom-right)
+    let stripe_positions: [(i16, i16, i16, i16); 5] = [
+        (8, 0, 0, 8),      // top-left corner
+        (18, 0, 0, 18),    //
+        (28, 0, 0, 28),    // middle
+        (36, 8, 8, 36),    //
+        (36, 18, 18, 36),  // bottom-right corner
+    ];
+
+    for (idx, (x1, y1, x2, y2)) in stripe_positions.iter().enumerate() {
+        LINE_POINTS[idx][0] = lvgl_sys::lv_point_t { x: *x1, y: *y1 };
+        LINE_POINTS[idx][1] = lvgl_sys::lv_point_t { x: *x2, y: *y2 };
+
+        let line = lvgl_sys::lv_line_create(parent);
+        lvgl_sys::lv_line_set_points(line, LINE_POINTS[idx].as_ptr(), 2);
+        lvgl_sys::lv_obj_set_style_line_color(line, lv_color_hex(stripe_color), 0);
+        lvgl_sys::lv_obj_set_style_line_width(line, 2, 0);
+        lvgl_sys::lv_obj_set_style_line_rounded(line, true, 0);
+    }
+}
+
+/// Helper: Draw diagonal stripes on smaller 30x30 objects
+unsafe fn draw_diagonal_stripes_small(parent: *mut lvgl_sys::lv_obj_t, _size: i16, stripe_color: u32) {
+    static mut LINE_POINTS_SMALL: [[lvgl_sys::lv_point_t; 2]; 4] = [[lvgl_sys::lv_point_t { x: 0, y: 0 }; 2]; 4];
+
+    // Stripe positions for 30x30 slots
+    let stripe_positions: [(i16, i16, i16, i16); 4] = [
+        (8, 0, 0, 8),      // top-left corner
+        (16, 0, 0, 16),    //
+        (24, 0, 0, 24),    // middle
+        (30, 6, 6, 30),    // bottom-right corner
+    ];
+
+    for (idx, (x1, y1, x2, y2)) in stripe_positions.iter().enumerate() {
+        LINE_POINTS_SMALL[idx][0] = lvgl_sys::lv_point_t { x: *x1, y: *y1 };
+        LINE_POINTS_SMALL[idx][1] = lvgl_sys::lv_point_t { x: *x2, y: *y2 };
+
+        let line = lvgl_sys::lv_line_create(parent);
+        lvgl_sys::lv_line_set_points(line, LINE_POINTS_SMALL[idx].as_ptr(), 2);
+        lvgl_sys::lv_obj_set_style_line_color(line, lv_color_hex(stripe_color), 0);
+        lvgl_sys::lv_obj_set_style_line_width(line, 2, 0);
+        lvgl_sys::lv_obj_set_style_line_rounded(line, true, 0);
+    }
+}
+
 /// Helper: Create HT (High Temp) slot visual
 unsafe fn create_ht_slot_visual(parent: *mut lvgl_sys::lv_obj_t, x: i16, y: i16, label: &str, color: u32, selected: bool) {
     let container = lvgl_sys::lv_obj_create(parent);
@@ -2627,9 +2680,16 @@ unsafe fn create_ht_slot_visual(parent: *mut lvgl_sys::lv_obj_t, x: i16, y: i16,
     lvgl_sys::lv_obj_set_size(slot, 30, 30);
     lvgl_sys::lv_obj_set_pos(slot, 50, 8);
     lvgl_sys::lv_obj_clear_flag(slot, lvgl_sys::LV_OBJ_FLAG_SCROLLABLE);
-    lvgl_sys::lv_obj_set_style_bg_color(slot, lv_color_hex(color), 0);
     lvgl_sys::lv_obj_set_style_radius(slot, 15, 0);
     set_style_pad_all(slot, 0);
+
+    if color != 0 {
+        lvgl_sys::lv_obj_set_style_bg_color(slot, lv_color_hex(color), 0);
+    } else {
+        // Empty slot - striped background
+        lvgl_sys::lv_obj_set_style_bg_color(slot, lv_color_hex(0x2A2A2A), 0);
+        draw_diagonal_stripes_small(slot, 30, 0x404040);
+    }
 
     if selected {
         lvgl_sys::lv_obj_set_style_border_width(slot, 3, 0);
@@ -2665,9 +2725,16 @@ unsafe fn create_ext_slot_visual(parent: *mut lvgl_sys::lv_obj_t, x: i16, y: i16
     lvgl_sys::lv_obj_set_size(slot, 30, 30);
     lvgl_sys::lv_obj_set_pos(slot, 50, 8);
     lvgl_sys::lv_obj_clear_flag(slot, lvgl_sys::LV_OBJ_FLAG_SCROLLABLE);
-    lvgl_sys::lv_obj_set_style_bg_color(slot, lv_color_hex(color), 0);
     lvgl_sys::lv_obj_set_style_radius(slot, 15, 0);
     set_style_pad_all(slot, 0);
+
+    if color != 0 {
+        lvgl_sys::lv_obj_set_style_bg_color(slot, lv_color_hex(color), 0);
+    } else {
+        // Empty slot - striped background
+        lvgl_sys::lv_obj_set_style_bg_color(slot, lv_color_hex(0x2A2A2A), 0);
+        draw_diagonal_stripes_small(slot, 30, 0x404040);
+    }
 
     if selected {
         lvgl_sys::lv_obj_set_style_border_width(slot, 3, 0);
