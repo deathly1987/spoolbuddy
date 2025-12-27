@@ -1,6 +1,6 @@
 #include "images.h"
 
-const ext_img_desc_t images[23] = {
+const ext_img_desc_t images[36] = {
     { "humidity", &img_humidity },
     { "spool_base", &img_spool_base },
     { "spool_clean", &img_spool_clean },
@@ -24,4 +24,17 @@ const ext_img_desc_t images[23] = {
     { "ok", &img_ok },
     { "home", &img_home },
     { "circle_empty", &img_circle_empty },
+    { "wifi", &img_wifi },
+    { "ip_address", &img_ip_address },
+    { "mqtt", &img_mqtt },
+    { "add", &img_add },
+    { "3d_cube", &img_3d_cube },
+    { "scale_2", &img_scale_2 },
+    { "display", &img_display },
+    { "calibrate", &img_calibrate },
+    { "firmware", &img_firmware },
+    { "update", &img_update },
+    { "reset", &img_reset },
+    { "about", &img_about },
+    { "thermometer", &img_thermometer },
 };

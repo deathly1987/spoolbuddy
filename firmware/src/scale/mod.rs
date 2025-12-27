@@ -11,7 +11,7 @@
 //! - 3V3  (I2C-OUT Pin 1) -> VCC
 //! - GND  (I2C-OUT Pin 4) -> GND
 
-#[allow(dead_code)]
-pub mod nau7802;
+#![allow(dead_code)]
+#![allow(unused)]
 
-pub use nau7802::{Nau7802State, NAU7802_ADDR};
+pub mod nau7802;

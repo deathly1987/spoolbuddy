@@ -7,7 +7,7 @@ file(GLOB EEZ_UI_SOURCES "*.c")
 idf_component_register(
     SRCS ${EEZ_UI_SOURCES}
     INCLUDE_DIRS "."
-    REQUIRES lvgl
+    REQUIRES lvgl nvs_flash
 )
 
 # Include LVGL configuration - both locations for compatibility

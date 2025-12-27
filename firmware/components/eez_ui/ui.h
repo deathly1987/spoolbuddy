@@ -24,6 +24,9 @@ void ui_tick();
 
 #if !defined(EEZ_FOR_LVGL)
 void loadScreen(enum ScreensEnum screenId);
+void navigate_to_settings_detail(const char *title);
+// Note: create_screen_settings_detail() is declared in screens.h without title param
+// Title is set dynamically via update_settings_detail_title() after screen creation
 #endif
 
 #ifdef __cplusplus

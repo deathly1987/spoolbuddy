@@ -370,12 +370,23 @@ int display_init(void)
         esp_err_t i2c_err;
 
         // Scan I2C bus first
-        ESP_LOGI(TAG, "Scanning I2C bus...");
+        ESP_LOGI(TAG, "Scanning I2C bus (GPIO15/16)...");
         for (uint8_t addr = 0x08; addr < 0x78; addr++) {
             uint8_t dummy;
             if (i2c_master_read_from_device(TOUCH_I2C_PORT, addr, &dummy, 1, 10) == ESP_OK) {
                 ESP_LOGI(TAG, "  Found device at 0x%02X", addr);
             }
+        }
+
+        // Specifically check for NAU7802 at 0x2A
+        ESP_LOGI(TAG, "Checking NAU7802 at 0x2A...");
+        uint8_t nau_reg = 0x1F;  // Revision register
+        uint8_t nau_val = 0;
+        esp_err_t nau_err = i2c_master_write_read_device(TOUCH_I2C_PORT, 0x2A, &nau_reg, 1, &nau_val, 1, 100);
+        if (nau_err == ESP_OK) {
+            ESP_LOGI(TAG, "  NAU7802 FOUND! Revision: 0x%02X", nau_val);
+        } else {
+            ESP_LOGW(TAG, "  NAU7802 NOT on GPIO15/16 bus (err=%d)", nau_err);
         }
 
         // Try 0x30 (STC8H1K28 on v1.3+)

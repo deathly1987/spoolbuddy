@@ -30,6 +30,19 @@ extern const lv_img_dsc_t img_back;
 extern const lv_img_dsc_t img_ok;
 extern const lv_img_dsc_t img_home;
 extern const lv_img_dsc_t img_circle_empty;
+extern const lv_img_dsc_t img_wifi;
+extern const lv_img_dsc_t img_ip_address;
+extern const lv_img_dsc_t img_mqtt;
+extern const lv_img_dsc_t img_add;
+extern const lv_img_dsc_t img_3d_cube;
+extern const lv_img_dsc_t img_scale_2;
+extern const lv_img_dsc_t img_display;
+extern const lv_img_dsc_t img_calibrate;
+extern const lv_img_dsc_t img_firmware;
+extern const lv_img_dsc_t img_update;
+extern const lv_img_dsc_t img_reset;
+extern const lv_img_dsc_t img_about;
+extern const lv_img_dsc_t img_thermometer;
 
 #ifndef EXT_IMG_DESC_T
 #define EXT_IMG_DESC_T
@@ -39,7 +52,7 @@ typedef struct _ext_img_desc_t {
 } ext_img_desc_t;
 #endif
 
-extern const ext_img_desc_t images[23];
+extern const ext_img_desc_t images[36];
 
 
 #ifdef __cplusplus

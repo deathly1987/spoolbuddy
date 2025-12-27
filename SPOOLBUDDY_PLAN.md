@@ -31,9 +31,9 @@ SpoolBuddy is a reimagined filament management system that combines:
 | Aspect | Choice |
 |--------|--------|
 | Architecture | Server + ESP32 Device |
-| Display | ESP32-S3 + 4.3" (800×480) |
+| Display | ESP32-S3 + 7.0" CrowPanel (800×480) |
 | Console + Scale | Combined unit |
-| Device UI | LVGL (embedded) |
+| Device UI | LVGL 9.x + EEZ Studio |
 | Web UI | Dedicated server (Preact) |
 | Database | SQLite on server |
 | NFC Reader | PN5180 (~20cm range) |
@@ -75,22 +75,22 @@ SpoolBuddy is a reimagined filament management system that combines:
 │ Browser │  │ Tablet  │  │      SpoolBuddy Device          │
 │         │  │         │  │                                 │
 │ Web UI  │  │ Web UI  │  │  ┌───────────────────────────┐  │
-│         │  │         │  │  │  ESP32-S3-Touch-LCD-4.3   │  │
-└─────────┘  └─────────┘  │  │  (Waveshare)              │  │
+│         │  │         │  │  │  ELECROW CrowPanel 7.0"   │  │
+└─────────┘  └─────────┘  │  │  (ESP32-S3)               │  │
                           │  │                           │  │
-                          │  │  • 4.3" 800×480 touch     │  │
+                          │  │  • 7.0" 800×480 RGB565    │  │
                           │  │  • WiFi + BLE 5           │  │
                           │  │  • 8MB Flash, 8MB PSRAM   │  │
-                          │  │  • Custom firmware (Rust) │  │
+                          │  │  • Rust + C (LVGL/EEZ)    │  │
                           │  │                           │  │
                           │  │  Peripherals:             │  │
                           │  │  ├── PN5180 (SPI) - NFC   │  │
-                          │  │  └── HX711 (GPIO) - Scale │  │
+                          │  │  └── NAU7802 (I2C) - ADC  │  │
                           │  └───────────────────────────┘  │
                           │                                 │
                           │      ┌───────┐  ┌───────┐       │
                           │      │PN5180 │  │ Scale │       │
-                          │      │  NFC  │  │ HX711 │       │
+                          │      │  NFC  │  │NAU7802│       │
                           │      └───────┘  └───────┘       │
                           └─────────────────────────────────┘
 ```
@@ -120,35 +120,44 @@ ESP32 Device                    Server
 
 | Component | Choice | Interface | Notes |
 |-----------|--------|-----------|-------|
-| **Main Board** | Waveshare ESP32-S3-Touch-LCD-4.3 | - | ESP32-S3, 8MB Flash, 8MB PSRAM |
-| **Display** | Built-in 4.3" IPS | Parallel RGB | 800×480, 5-point capacitive touch |
+| **Main Board** | ELECROW CrowPanel 7.0" | - | ESP32-S3, 8MB Flash, 8MB PSRAM |
+| **Display** | Built-in 7.0" IPS | RGB565 Parallel | 800×480, capacitive touch (GT911) |
 | **NFC Reader** | PN5180 module | SPI | Extended range (~20cm), MIFARE Crypto1 support |
-| **Scale** | HX711 + Load Cell | GPIO | Standard load cell setup |
+| **Scale** | NAU7802 + Load Cell | I2C | 24-bit ADC, I2C interface |
 | **Power** | USB-C 5V/2A | - | Single power input |
 
-### ESP32-S3-Touch-LCD-4.3 Specifications
+### ELECROW CrowPanel 7.0" Specifications
 
-- **Processor**: Xtensa 32-bit LX7 dual-core, up to 240MHz
+- **Processor**: ESP32-S3 Xtensa 32-bit LX7 dual-core, up to 240MHz
 - **Memory**: 512KB SRAM, 384KB ROM, 8MB PSRAM, 8MB Flash
 - **Wireless**: 2.4GHz WiFi (802.11 b/g/n), Bluetooth 5 (LE)
-- **Display**: 4.3" IPS, 800×480, 65K colors, capacitive touch (I2C, 5-point)
-- **Interfaces**: SPI, I2C, UART, CAN, RS485, USB, TF card slot
-- **Wiki**: https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3
+- **Display**: 7.0" IPS, 800×480, RGB565, capacitive touch (GT911)
+- **Interfaces**: SPI, I2C, UART, USB-C, expansion headers
+- **Wiki**: https://www.elecrow.com/wiki/esp32-display-702770-inch-hmi-display-rgb-tft-lcd-touch-screen-lvgl.html
 
 ### Hardware Sources
 
 | Component | Source | Price | Status |
 |-----------|--------|-------|--------|
-| ESP32 Display | [Amazon.de](https://www.amazon.de/dp/B0CNZ6CHR7) | ~€45 | Ordered |
-| NFC Reader | [LaskaKit.cz](https://www.laskakit.cz/en/rfid-ctecka-s-vestavenou-antenou-nfc-rf-pn5180-iso15693-cteni-i-zapis/) | €10.23 | Ordered |
-| HX711 + Load Cell | TBD | ~€10 | TBD |
+| CrowPanel 7.0" | [ELECROW](https://www.elecrow.com/) | ~€60 | Acquired |
+| NFC Reader PN5180 | [LaskaKit.cz](https://www.laskakit.cz/en/rfid-ctecka-s-vestavenou-antenou-nfc-rf-pn5180-iso15693-cteni-i-zapis/) | €10.23 | Ordered |
+| NAU7802 ADC + Load Cell | Various | ~€15 | TBD |
 
 ### GPIO Pin Allocation
 
 ```
-ESP32-S3-Touch-LCD-4.3 GPIO (directly from connectors):
+ELECROW CrowPanel 7.0" GPIO:
 
-PN5180 (SPI - directly on expansion header):
+Display (RGB565 - internal):
+  - Directly driven by ESP32-S3 RGB peripheral
+
+Touch (I2C - GT911):
+  - SDA: GPIO 19
+  - SCL: GPIO 20
+  - INT: GPIO 18
+  - RST: GPIO 38
+
+PN5180 (SPI - expansion header):
   - MOSI: GPIO 11
   - MISO: GPIO 13
   - SCLK: GPIO 12
@@ -156,12 +165,12 @@ PN5180 (SPI - directly on expansion header):
   - BUSY: GPIO 14
   - RST:  GPIO 21
 
-HX711 (Scale - directly on expansion header):
-  - DT:   GPIO 1
-  - SCK:  GPIO 2
+NAU7802 (Scale ADC - I2C):
+  - SDA: GPIO 17
+  - SCL: GPIO 18
+  - Address: 0x2A
 
-Note: Pin assignments TBD based on available GPIOs on expansion connectors.
-      Check Waveshare wiki for actual pinout.
+Note: Pin assignments subject to change based on expansion connector availability.
 ```
 
 ### Physical Design
@@ -170,7 +179,7 @@ Note: Pin assignments TBD based on available GPIOs on expansion connectors.
 - NFC antenna (PN5180) positioned under scale platform center
 - Spool sits on platform, center hole aligns with NFC reader
 - Extended NFC range (~20cm) enables reading Bambu Lab tags inside spool core
-- 4.3" display angled for visibility
+- 7.0" display angled for visibility
 - Single USB-C power input
 
 ---
@@ -225,16 +234,20 @@ backend/
 - Real-time updates via WebSocket
 - Works in browser and on device's built-in display
 
-### 3. Device Firmware (Rust/ESP32)
+### 3. Device Firmware (Rust + C)
 
-**Target:** ESP32-S3-Touch-LCD-4.3 (Waveshare)
+**Target:** ELECROW CrowPanel 7.0" (ESP32-S3)
 
-**Framework:** esp-hal + embassy (async)
+**Framework:** esp-idf-hal (Rust) + LVGL 9.x (C) + EEZ Studio
+
+**Architecture:**
+- **Rust**: Main application, hardware drivers (NFC, Scale), WiFi
+- **C**: Display driver, LVGL initialization, EEZ Studio generated UI
 
 **Responsibilities:**
 - Read NFC tags (PN5180 via SPI)
-- Read scale weight (HX711 via GPIO)
-- Display UI (LVGL or custom)
+- Read scale weight (NAU7802 via I2C)
+- Display UI (LVGL 9.x with EEZ Studio screens)
 - WiFi connection to server
 - WebSocket communication
 - Local display of spool info, weight, status
@@ -243,27 +256,41 @@ backend/
 ```
 firmware/
 ├── Cargo.toml
+├── build.rs
 ├── src/
-│   ├── main.rs         # Entry point, task spawning
-│   ├── wifi.rs         # WiFi connection
-│   ├── websocket.rs    # Server communication
+│   ├── main.rs           # Entry point, calls C display driver
+│   ├── wifi_init.rs      # WiFi connection
 │   ├── nfc/
 │   │   ├── mod.rs
-│   │   └── pn5180.rs   # PN5180 driver
-│   ├── scale/
-│   │   ├── mod.rs
-│   │   └── hx711.rs    # HX711 driver
-│   └── ui/
+│   │   └── pn5180.rs     # PN5180 driver (WIP)
+│   └── scale/
 │       ├── mod.rs
-│       └── screens.rs  # LVGL screens
-└── build.rs
+│       └── nau7802.rs    # NAU7802 driver (WIP)
+├── components/
+│   ├── display_driver/   # C display + touch driver
+│   │   ├── display_driver.c
+│   │   └── display_driver.h
+│   ├── eez_ui/           # EEZ Studio generated UI
+│   │   ├── ui.c          # Custom navigation logic
+│   │   ├── screens.c     # Generated screen definitions
+│   │   ├── screens.h
+│   │   ├── images.c/h    # Icon/image assets
+│   │   ├── styles.c/h    # UI styles
+│   │   └── ui_image_*.c  # Individual image data
+│   └── lvgl/             # LVGL 9.x library (git submodule)
+├── lvgl-configs/
+│   ├── lv_conf.h         # LVGL configuration
+│   └── lv_drv_conf.h
+├── update_eez_screens.sh # Script to sync EEZ exports
+└── eez/                  # EEZ Studio project (sibling dir)
+    └── spoolbuddy.eez-project
 ```
 
-**Key Crates:**
-- `esp-hal` - ESP32-S3 hardware abstraction
-- `embassy-executor` - Async runtime
-- `embassy-net` - Networking
-- `embedded-graphics` or `lvgl` - UI rendering
+**Key Dependencies:**
+- `esp-idf-hal` - ESP32 hardware abstraction (Rust)
+- `esp-idf-sys` - ESP-IDF bindings (links C components)
+- LVGL 9.x - UI framework (C)
+- EEZ Studio - UI design tool (generates C code)
 
 ---
 
@@ -309,18 +336,33 @@ firmware/
 
 **Deliverable:** Full printer MQTT integration with AMS control
 
-### Phase 3: Device Firmware 🔄 Next
+### Phase 3: Device Firmware 🔄 In Progress
 
 **Goal:** ESP32-S3 firmware for NFC + Scale
 
-**Firmware:**
-- [ ] Project setup (esp-hal + embassy)
+**Firmware - UI Setup:** ✅ Complete
+- [x] Project setup (esp-idf-hal + C components)
+- [x] Display driver (RGB565 parallel, 800×480)
+- [x] Touch driver (GT911 I2C)
+- [x] LVGL 9.x integration
+- [x] EEZ Studio UI project setup
+- [x] Screen navigation system (15 screens)
+- [x] Custom navigation handlers (tabs, menus, back buttons)
+- [x] Settings sub-pages with proper back navigation
+
+**Firmware - Hardware Integration:** ⏳ Pending
 - [ ] WiFi connection and config portal
 - [ ] WebSocket client to server
-- [ ] PN5180 NFC driver (SPI)
-- [ ] HX711 scale driver (GPIO)
-- [ ] Basic LVGL UI (weight display, status)
+- [ ] PN5180 NFC driver (SPI) - module exists, needs integration
+- [ ] NAU7802 scale driver (I2C) - module exists, needs integration
 - [ ] Tag read → WebSocket → Server flow
+
+**Firmware Screens (implemented in EEZ Studio):**
+- Main (home with scan/encode buttons)
+- AMS Overview (printer status)
+- Scan Result (scanned spool info)
+- Spool Details (edit spool data)
+- Settings (with 9 sub-pages: WiFi, MQTT, Printer, NFC, Scale, Display, About, Update, Reset)
 
 **Server:**
 - [x] WebSocket handler for tag_detected messages
@@ -589,19 +631,24 @@ spoolbuddy/
 │   │   └── lib/
 │   └── public/
 │
-├── firmware/                   # ESP32-S3 firmware (Rust)
+├── firmware/                   # ESP32-S3 firmware (Rust + C)
 │   ├── Cargo.toml
+│   ├── build.rs
 │   ├── src/
-│   │   ├── main.rs
-│   │   ├── wifi.rs
-│   │   ├── websocket.rs
+│   │   ├── main.rs             # Entry point
+│   │   ├── wifi_init.rs        # WiFi module
 │   │   ├── nfc/
-│   │   │   └── pn5180.rs
-│   │   ├── scale/
-│   │   │   └── hx711.rs
-│   │   └── ui/
-│   │       └── screens.rs
-│   └── build.rs
+│   │   │   └── pn5180.rs       # NFC driver
+│   │   └── scale/
+│   │       └── nau7802.rs      # ADC driver
+│   ├── components/
+│   │   ├── display_driver/     # C display driver
+│   │   ├── eez_ui/             # EEZ Studio UI (generated + custom)
+│   │   └── lvgl/               # LVGL 9.x (git submodule)
+│   └── update_eez_screens.sh   # EEZ sync script
+│
+├── eez/                        # EEZ Studio project
+│   └── spoolbuddy.eez-project
 │
 ├── docker/
 │   ├── Dockerfile
@@ -773,8 +820,11 @@ spoolbuddy/
 | **Usage tracking** | ✅ Via AMS remain% | - |
 | **Spool-to-slot assignments** | ✅ Persistent | - |
 | **Usage history logging** | ✅ Implemented | - |
-| **NFC tag read/write** | ⏳ Pending (firmware) | High |
-| **Scale integration** | ⏳ Pending (firmware) | High |
+| **Device UI (LVGL/EEZ)** | ✅ 15 screens | - |
+| **Device display/touch** | ✅ CrowPanel 7" | - |
+| **NFC tag read/write** | ⏳ Pending (integration) | High |
+| **Scale integration** | ⏳ Pending (integration) | High |
+| **WiFi/WebSocket** | ⏳ Pending (integration) | High |
 | **Gcode analysis** | ❌ Missing | Medium |
 | **SSDP printer discovery** | ❌ Missing | Low |
 | **Printer state persistence** | ❌ Missing | Low |
@@ -785,8 +835,8 @@ spoolbuddy/
 ### Priority Implementation List
 
 **High Priority (Core Functionality):**
-1. NFC tag reading (PN5180 driver in firmware)
-2. Scale integration (HX711 driver in firmware)
+1. NFC tag reading (PN5180 driver in firmware) - module exists
+2. Scale integration (NAU7802 driver in firmware) - module exists
 3. WebSocket device communication
 
 **Medium Priority (Enhanced Features):**
@@ -804,14 +854,21 @@ spoolbuddy/
 
 ## Next Steps
 
-**Current:** Phase 3 - Device Firmware
+**Current:** Phase 3 - Device Firmware (Hardware Integration)
 
-1. Set up ESP32-S3 Rust project with esp-hal
-2. Implement WiFi connection
-3. Implement PN5180 NFC driver
-4. Implement HX711 scale driver
-5. WebSocket client to server
-6. Basic UI for weight/status display
+**Completed:**
+- [x] ESP32-S3 project setup with esp-idf-hal
+- [x] Display and touch driver integration
+- [x] LVGL 9.x + EEZ Studio UI framework
+- [x] All 15 screens designed and implemented
+- [x] Navigation system with back button support
+
+**Next:**
+1. Integrate WiFi connection with UI (settings screen)
+2. Integrate PN5180 NFC driver with display feedback
+3. Integrate NAU7802 scale driver with weight display
+4. WebSocket client to backend server
+5. Wire up UI elements to real hardware data
 
 ---
 
