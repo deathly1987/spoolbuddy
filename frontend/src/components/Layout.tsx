@@ -23,14 +23,14 @@ export function Layout({ children }: LayoutProps) {
   return (
     <div class="min-h-screen flex flex-col bg-[var(--bg-secondary)]">
       {/* Header */}
-      <header class="bg-[var(--bg-header)] text-white shadow-lg">
+      <header class="bg-[var(--bg-header)] text-[var(--header-text)] shadow-md border-b border-[var(--border-color)]">
         <div class="w-full px-4 sm:px-6 lg:px-8">
           <div class="flex items-center justify-between h-16">
             {/* Logo */}
             <div class="flex items-center">
               <Link href="/" class="flex items-center">
                 <img
-                  src="/spoolbuddy_logo_transparent.png"
+                  src={theme === "dark" ? "/spoolbuddy_logo_dark.png" : "/spoolbuddy_logo_light.png"}
                   alt="SpoolBuddy"
                   class="h-10"
                 />
@@ -45,8 +45,8 @@ export function Layout({ children }: LayoutProps) {
                   href={item.path}
                   class={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     location === item.path
-                      ? "bg-[var(--bg-header-active)] text-white"
-                      : "text-white/80 hover:bg-[var(--bg-header-hover)] hover:text-white"
+                      ? "bg-[var(--accent-color)] text-white"
+                      : "text-[var(--header-text-muted)] hover:bg-[var(--bg-header-hover)] hover:text-[var(--header-text)]"
                   }`}
                 >
                   {item.label}
@@ -65,7 +65,7 @@ export function Layout({ children }: LayoutProps) {
                 {theme === "dark" ? (
                   <Sun class="w-5 h-5 text-yellow-300" />
                 ) : (
-                  <Moon class="w-5 h-5 text-white/80" />
+                  <Moon class="w-5 h-5 text-[var(--header-text-muted)]" />
                 )}
               </button>
 
@@ -73,19 +73,19 @@ export function Layout({ children }: LayoutProps) {
               <div class="flex items-center space-x-2">
                 <div
                   class={`w-3 h-3 rounded-full ${
-                    deviceConnected ? "bg-green-400" : "bg-red-400"
+                    deviceConnected ? "bg-green-500" : "bg-red-500"
                   }`}
                   title={deviceConnected ? "Device connected" : "Device disconnected"}
                 />
-                <span class="text-sm text-white/70">
+                <span class="text-sm text-[var(--header-text-muted)]">
                   {deviceConnected ? "Connected" : "Offline"}
                 </span>
               </div>
 
               {/* Weight display */}
               {currentWeight !== null && (
-                <div class="bg-[var(--bg-header-active)] px-3 py-1 rounded-md">
-                  <span class="text-sm font-mono">{currentWeight.toFixed(1)}g</span>
+                <div class="bg-[var(--bg-tertiary)] px-3 py-1 rounded-md">
+                  <span class="text-sm font-mono text-[var(--header-text)]">{currentWeight.toFixed(1)}g</span>
                 </div>
               )}
             </div>
@@ -94,7 +94,7 @@ export function Layout({ children }: LayoutProps) {
       </header>
 
       {/* Mobile navigation */}
-      <nav class="md:hidden bg-[var(--bg-header-hover)] border-t border-[var(--border-color)]">
+      <nav class="md:hidden bg-[var(--bg-header)] border-t border-[var(--border-color)]">
         <div class="flex justify-around">
           {navItems.map((item) => (
             <Link
@@ -102,8 +102,8 @@ export function Layout({ children }: LayoutProps) {
               href={item.path}
               class={`flex flex-col items-center py-2 px-3 text-xs ${
                 location === item.path
-                  ? "text-white"
-                  : "text-white/70"
+                  ? "text-[var(--accent-color)]"
+                  : "text-[var(--header-text-muted)]"
               }`}
             >
               <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

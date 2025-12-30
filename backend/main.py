@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from db import get_db
 from mqtt import PrinterManager
-from api import spools_router, printers_router, updates_router, firmware_router, tags_router, device_router, serial_router
+from api import spools_router, printers_router, updates_router, firmware_router, tags_router, device_router, serial_router, discovery_router
 from api.printers import set_printer_manager
 from api.cloud import router as cloud_router
 from models import PrinterState
@@ -114,11 +114,58 @@ def on_printer_state_update(serial: str, state: PrinterState):
     # Store current state as previous for next update
     _previous_states[serial] = state.model_copy()
 
+    # Debug: Log AMS state being sent via WebSocket
+    if state.ams_units:
+        logger.info(f"[{serial}] Sending {len(state.ams_units)} AMS units via WebSocket:")
+        for unit in state.ams_units:
+            logger.info(f"[{serial}]   Unit id={unit.id}, extruder={unit.extruder}, trays={len(unit.trays)}")
+            for tray in unit.trays:
+                logger.info(f"[{serial}]     Tray ams_id={tray.ams_id}, tray_id={tray.tray_id}: {tray.tray_type} ({tray.tray_color})")
+
     # Convert to dict for JSON serialization
     message = {
         "type": "printer_state",
         "serial": serial,
         "state": state.model_dump(),
+    }
+
+    # Schedule broadcast in event loop
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(broadcast_message(message))
+    except RuntimeError:
+        pass  # No running loop
+
+
+def on_printer_connect(serial: str):
+    """Handle printer connection from MQTT."""
+    logger.info(f"Printer {serial} connected - notifying clients")
+
+    # Broadcast connection
+    message = {
+        "type": "printer_connected",
+        "serial": serial,
+    }
+
+    # Schedule broadcast in event loop
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(broadcast_message(message))
+    except RuntimeError:
+        pass  # No running loop
+
+
+def on_printer_disconnect(serial: str):
+    """Handle printer disconnection from MQTT."""
+    logger.info(f"Printer {serial} disconnected - notifying clients")
+
+    # Clear previous state
+    _previous_states.pop(serial, None)
+
+    # Broadcast disconnection
+    message = {
+        "type": "printer_disconnected",
+        "serial": serial,
     }
 
     # Schedule broadcast in event loop
@@ -167,6 +214,8 @@ async def lifespan(app: FastAPI):
     # Set up printer manager
     set_printer_manager(printer_manager)
     printer_manager.set_state_callback(on_printer_state_update)
+    printer_manager.set_connect_callback(on_printer_connect)
+    printer_manager.set_disconnect_callback(on_printer_disconnect)
 
     # Auto-connect printers
     asyncio.create_task(auto_connect_printers())
@@ -204,6 +253,7 @@ app.include_router(firmware_router, prefix="/api")
 app.include_router(tags_router, prefix="/api")
 app.include_router(device_router, prefix="/api")
 app.include_router(serial_router, prefix="/api")
+app.include_router(discovery_router, prefix="/api")
 
 
 async def handle_tag_detected(websocket: WebSocket, message: dict):

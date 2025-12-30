@@ -1140,6 +1140,7 @@ void create_screen_main() {
                     lv_obj_set_style_shadow_spread(obj, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
                     lv_obj_set_style_shadow_width(obj, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
                     lv_obj_set_style_shadow_opa(obj, 100, LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_obj_set_style_bg_color(obj, lv_color_hex(0xff00ff00), LV_PART_INDICATOR | LV_STATE_DEFAULT);
                 }
                 {
                     lv_obj_t *obj = lv_label_create(parent_obj);
@@ -1774,7 +1775,7 @@ void create_screen_ams_overview() {
                             lv_obj_set_pos(obj, 155, -17);
                             lv_obj_set_size(obj, 21, 14);
                             lv_image_set_src(obj, &img_thermometer);
-                            lv_image_set_scale(obj, 100);
+                            lv_image_set_scale(obj, 95);
                             lv_obj_set_style_image_recolor(obj, lv_color_hex(0xff1967ea), LV_PART_MAIN | LV_STATE_DEFAULT);
                             lv_obj_set_style_image_recolor_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
                         }
@@ -1850,7 +1851,7 @@ void create_screen_ams_overview() {
                             lv_obj_set_pos(obj, 155, -17);
                             lv_obj_set_size(obj, 21, 14);
                             lv_image_set_src(obj, &img_thermometer);
-                            lv_image_set_scale(obj, 100);
+                            lv_image_set_scale(obj, 95);
                             lv_obj_set_style_image_recolor(obj, lv_color_hex(0xff1967ea), LV_PART_MAIN | LV_STATE_DEFAULT);
                             lv_obj_set_style_image_recolor_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
                         }
@@ -2163,7 +2164,7 @@ void create_screen_ams_overview() {
                             lv_obj_set_pos(obj, 33, 133);
                             lv_obj_set_size(obj, 21, 14);
                             lv_image_set_src(obj, &img_thermometer);
-                            lv_image_set_scale(obj, 100);
+                            lv_image_set_scale(obj, 95);
                             lv_obj_set_style_image_recolor(obj, lv_color_hex(0xff1967ea), LV_PART_MAIN | LV_STATE_DEFAULT);
                             lv_obj_set_style_image_recolor_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
                         }
@@ -2276,7 +2277,7 @@ void create_screen_ams_overview() {
                             lv_obj_set_pos(obj, 33, 133);
                             lv_obj_set_size(obj, 21, 14);
                             lv_image_set_src(obj, &img_thermometer);
-                            lv_image_set_scale(obj, 100);
+                            lv_image_set_scale(obj, 95);
                             lv_obj_set_style_image_recolor(obj, lv_color_hex(0xff1967ea), LV_PART_MAIN | LV_STATE_DEFAULT);
                             lv_obj_set_style_image_recolor_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
                         }
@@ -2668,7 +2669,7 @@ void create_screen_ams_overview() {
                             lv_obj_set_pos(obj, 155, -17);
                             lv_obj_set_size(obj, 21, 14);
                             lv_image_set_src(obj, &img_thermometer);
-                            lv_image_set_scale(obj, 100);
+                            lv_image_set_scale(obj, 95);
                             lv_obj_set_style_image_recolor(obj, lv_color_hex(0xff1967ea), LV_PART_MAIN | LV_STATE_DEFAULT);
                             lv_obj_set_style_image_recolor_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
                         }
@@ -2936,7 +2937,7 @@ void create_screen_ams_overview() {
                             lv_obj_set_pos(obj, 155, -17);
                             lv_obj_set_size(obj, 21, 14);
                             lv_image_set_src(obj, &img_thermometer);
-                            lv_image_set_scale(obj, 100);
+                            lv_image_set_scale(obj, 95);
                             lv_obj_set_style_image_recolor(obj, lv_color_hex(0xff1967ea), LV_PART_MAIN | LV_STATE_DEFAULT);
                             lv_obj_set_style_image_recolor_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
                         }
@@ -3277,7 +3278,7 @@ void create_screen_scan_result() {
                                     lv_obj_set_style_text_font(obj, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-                                    lv_label_set_text(obj, "L");
+                                    lv_label_set_text(obj, " L ");
                                 }
                             }
                         }
@@ -3367,7 +3368,7 @@ void create_screen_scan_result() {
                                 {
                                     lv_obj_t *obj = lv_label_create(parent_obj);
                                     objects.obj162 = obj;
-                                    lv_obj_set_pos(obj, -9, 13);
+                                    lv_obj_set_pos(obj, -12, 13);
                                     lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
                                     lv_obj_set_style_bg_color(obj, lv_color_hex(0xff00ff00), LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_bg_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -3375,7 +3376,7 @@ void create_screen_scan_result() {
                                     lv_obj_set_style_text_font(obj, &lv_font_montserrat_16, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-                                    lv_label_set_text(obj, "L");
+                                    lv_label_set_text(obj, " L ");
                                 }
                             }
                         }
@@ -3465,7 +3466,7 @@ void create_screen_scan_result() {
                                 {
                                     lv_obj_t *obj = lv_label_create(parent_obj);
                                     objects.obj168 = obj;
-                                    lv_obj_set_pos(obj, -9, 14);
+                                    lv_obj_set_pos(obj, -13, 14);
                                     lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
                                     lv_obj_set_style_bg_color(obj, lv_color_hex(0xff00ff00), LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_bg_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -3473,7 +3474,7 @@ void create_screen_scan_result() {
                                     lv_obj_set_style_text_font(obj, &lv_font_montserrat_16, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-                                    lv_label_set_text(obj, "R");
+                                    lv_label_set_text(obj, " R ");
                                 }
                             }
                         }
@@ -3563,7 +3564,7 @@ void create_screen_scan_result() {
                                 {
                                     lv_obj_t *obj = lv_label_create(parent_obj);
                                     objects.obj174 = obj;
-                                    lv_obj_set_pos(obj, -10, 14);
+                                    lv_obj_set_pos(obj, -13, 14);
                                     lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
                                     lv_obj_set_style_bg_color(obj, lv_color_hex(0xff00ff00), LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_bg_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -3571,7 +3572,7 @@ void create_screen_scan_result() {
                                     lv_obj_set_style_text_font(obj, &lv_font_montserrat_16, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-                                    lv_label_set_text(obj, "R");
+                                    lv_label_set_text(obj, " R ");
                                 }
                             }
                         }
@@ -3661,7 +3662,7 @@ void create_screen_scan_result() {
                                 {
                                     lv_obj_t *obj = lv_label_create(parent_obj);
                                     objects.obj180 = obj;
-                                    lv_obj_set_pos(obj, -8, 14);
+                                    lv_obj_set_pos(obj, -11, 14);
                                     lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
                                     lv_obj_set_style_bg_color(obj, lv_color_hex(0xff00ff00), LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_bg_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -3669,7 +3670,7 @@ void create_screen_scan_result() {
                                     lv_obj_set_style_text_font(obj, &lv_font_montserrat_16, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-                                    lv_label_set_text(obj, "L");
+                                    lv_label_set_text(obj, " L ");
                                 }
                             }
                         }
@@ -3723,15 +3724,15 @@ void create_screen_scan_result() {
                                 {
                                     lv_obj_t *obj = lv_label_create(parent_obj);
                                     objects.obj184 = obj;
-                                    lv_obj_set_pos(obj, 33, -15);
-                                    lv_obj_set_size(obj, 12, 12);
+                                    lv_obj_set_pos(obj, 30, -15);
+                                    lv_obj_set_size(obj, 15, 12);
                                     lv_obj_set_style_bg_color(obj, lv_color_hex(0xff00ff00), LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_bg_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_color(obj, lv_color_hex(0xff000000), LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_font(obj, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-                                    lv_label_set_text(obj, "R");
+                                    lv_label_set_text(obj, " R ");
                                 }
                             }
                         }
@@ -3793,7 +3794,7 @@ void create_screen_scan_result() {
                                     lv_obj_set_style_text_font(obj, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-                                    lv_label_set_text(obj, "L");
+                                    lv_label_set_text(obj, " L ");
                                 }
                             }
                         }
@@ -3847,15 +3848,15 @@ void create_screen_scan_result() {
                                 {
                                     lv_obj_t *obj = lv_label_create(parent_obj);
                                     objects.obj192 = obj;
-                                    lv_obj_set_pos(obj, 33, -15);
-                                    lv_obj_set_size(obj, 12, 12);
+                                    lv_obj_set_pos(obj, 28, -15);
+                                    lv_obj_set_size(obj, 17, 12);
                                     lv_obj_set_style_bg_color(obj, lv_color_hex(0xff00ff00), LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_bg_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_color(obj, lv_color_hex(0xff000000), LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_font(obj, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
                                     lv_obj_set_style_text_opa(obj, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-                                    lv_label_set_text(obj, "R");
+                                    lv_label_set_text(obj, " R ");
                                 }
                             }
                         }

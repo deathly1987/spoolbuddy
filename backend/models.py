@@ -119,9 +119,15 @@ class PrinterState(BaseModel):
     layer_num: Optional[int] = None
     total_layer_num: Optional[int] = None
     subtask_name: Optional[str] = None
+    mc_remaining_time: Optional[int] = None  # Remaining time in minutes
+    gcode_file: Optional[str] = None  # Current gcode file path
     ams_units: list[AmsUnit] = []
     vt_tray: Optional[AmsTray] = None
-    tray_now: Optional[int] = None  # Currently active tray (0-15 for AMS, 254/255 for external)
+    tray_now: Optional[int] = None  # Currently active tray (0-15 for AMS, 254/255 for external) - legacy single-nozzle
+    # Dual-nozzle support (H2C/H2D)
+    tray_now_left: Optional[int] = None  # Active tray for left nozzle (extruder 1)
+    tray_now_right: Optional[int] = None  # Active tray for right nozzle (extruder 0)
+    active_extruder: Optional[int] = None  # Currently active extruder (0=right, 1=left)
 
 
 # ============ AMS Filament Setting ============

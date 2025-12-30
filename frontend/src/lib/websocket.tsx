@@ -28,9 +28,15 @@ export interface PrinterState {
   layer_num: number | null;
   total_layer_num: number | null;
   subtask_name: string | null;
+  mc_remaining_time: number | null; // Remaining time in minutes
+  gcode_file: string | null; // Current gcode file path
   ams_units: AmsUnit[];
   vt_tray: AmsTray | null;
-  tray_now: number | null; // Currently active tray (0-15 for AMS, 254/255 for external)
+  tray_now: number | null; // Currently active tray (0-15 for AMS, 254/255 for external) - legacy single-nozzle
+  // Dual-nozzle support (H2C/H2D)
+  tray_now_left: number | null; // Active tray for left nozzle (extruder 1)
+  tray_now_right: number | null; // Active tray for right nozzle (extruder 0)
+  active_extruder: number | null; // Currently active extruder (0=right, 1=left)
 }
 
 interface WebSocketState {

@@ -7235,7 +7235,7 @@
                       "setPivot": false,
                       "pivotX": 0,
                       "pivotY": 0,
-                      "zoom": 100,
+                      "zoom": 95,
                       "angle": 0,
                       "innerAlign": "CENTER"
                     }
@@ -7609,7 +7609,7 @@
                       "setPivot": false,
                       "pivotX": 0,
                       "pivotY": 0,
-                      "zoom": 100,
+                      "zoom": 95,
                       "angle": 0,
                       "innerAlign": "CENTER"
                     },
@@ -9280,7 +9280,7 @@
                       "setPivot": false,
                       "pivotX": 0,
                       "pivotY": 0,
-                      "zoom": 100,
+                      "zoom": 95,
                       "angle": 0,
                       "innerAlign": "CENTER"
                     }
@@ -9868,7 +9868,7 @@
                       "setPivot": false,
                       "pivotX": 0,
                       "pivotY": 0,
-                      "zoom": 100,
+                      "zoom": 95,
                       "angle": 0,
                       "innerAlign": "CENTER"
                     }
@@ -11855,7 +11855,7 @@
                       "setPivot": false,
                       "pivotX": 0,
                       "pivotY": 0,
-                      "zoom": 100,
+                      "zoom": 95,
                       "angle": 0,
                       "innerAlign": "CENTER"
                     }
@@ -13304,7 +13304,7 @@
                       "setPivot": false,
                       "pivotX": 0,
                       "pivotY": 0,
-                      "zoom": 100,
+                      "zoom": 95,
                       "angle": 0,
                       "innerAlign": "CENTER"
                     }
@@ -14814,7 +14814,7 @@
                           },
                           "group": "",
                           "groupIndex": 0,
-                          "text": "L",
+                          "text": " L ",
                           "textType": "literal",
                           "longMode": "WRAP",
                           "recolor": false
@@ -15161,9 +15161,9 @@
                         {
                           "objID": "e165da85-5476-4fa9-802b-bc4de1f4ad31",
                           "type": "LVGLLabelWidget",
-                          "left": -9,
+                          "left": -12,
                           "top": 13,
-                          "width": 10,
+                          "width": 18,
                           "height": 18,
                           "customInputs": [],
                           "customOutputs": [],
@@ -15209,7 +15209,7 @@
                           },
                           "group": "",
                           "groupIndex": 0,
-                          "text": "L",
+                          "text": " L ",
                           "textType": "literal",
                           "longMode": "WRAP",
                           "recolor": false
@@ -15556,9 +15556,9 @@
                         {
                           "objID": "a67a0b91-41e9-4b7e-d6a6-f9ee05de83e8",
                           "type": "LVGLLabelWidget",
-                          "left": -9,
+                          "left": -13,
                           "top": 14,
-                          "width": 12,
+                          "width": 20,
                           "height": 18,
                           "customInputs": [],
                           "customOutputs": [],
@@ -15604,7 +15604,7 @@
                           },
                           "group": "",
                           "groupIndex": 0,
-                          "text": "R",
+                          "text": " R ",
                           "textType": "literal",
                           "longMode": "WRAP",
                           "recolor": false
@@ -15951,9 +15951,9 @@
                         {
                           "objID": "7087a8a9-60ce-4149-b2f4-31234284534d",
                           "type": "LVGLLabelWidget",
-                          "left": -10,
+                          "left": -13,
                           "top": 14,
-                          "width": 12,
+                          "width": 20,
                           "height": 18,
                           "customInputs": [],
                           "customOutputs": [],
@@ -15999,7 +15999,7 @@
                           },
                           "group": "",
                           "groupIndex": 0,
-                          "text": "R",
+                          "text": " R ",
                           "textType": "literal",
                           "longMode": "WRAP",
                           "recolor": false
@@ -16346,9 +16346,9 @@
                         {
                           "objID": "768ca160-9418-4d82-f7a4-28b9214dc58e",
                           "type": "LVGLLabelWidget",
-                          "left": -8,
+                          "left": -11,
                           "top": 14,
-                          "width": 10,
+                          "width": 18,
                           "height": 18,
                           "customInputs": [],
                           "customOutputs": [],
@@ -16394,7 +16394,7 @@
                           },
                           "group": "",
                           "groupIndex": 0,
-                          "text": "L",
+                          "text": " L ",
                           "textType": "literal",
                           "longMode": "WRAP",
                           "recolor": false
@@ -16573,9 +16573,9 @@
                         {
                           "objID": "65c46765-630b-457e-cede-8742b5c72ee3",
                           "type": "LVGLLabelWidget",
-                          "left": 33,
+                          "left": 30,
                           "top": -15,
-                          "width": 12,
+                          "width": 15,
                           "height": 12,
                           "customInputs": [],
                           "customOutputs": [],
@@ -16621,7 +16621,7 @@
                           },
                           "group": "",
                           "groupIndex": 0,
-                          "text": "R",
+                          "text": " R ",
                           "textType": "literal",
                           "longMode": "WRAP",
                           "recolor": false
@@ -16847,7 +16847,7 @@
                           },
                           "group": "",
                           "groupIndex": 0,
-                          "text": "L",
+                          "text": " L ",
                           "textType": "literal",
                           "longMode": "WRAP",
                           "recolor": false
@@ -17025,9 +17025,9 @@
                         {
                           "objID": "ef3ea462-c721-41f3-bf61-6238e717df76",
                           "type": "LVGLLabelWidget",
-                          "left": 33,
+                          "left": 28,
                           "top": -15,
-                          "width": 12,
+                          "width": 17,
                           "height": 12,
                           "customInputs": [],
                           "customOutputs": [],
@@ -17073,7 +17073,7 @@
                           },
                           "group": "",
                           "groupIndex": 0,
-                          "text": "R",
+                          "text": " R ",
                           "textType": "literal",
                           "longMode": "WRAP",
                           "recolor": false

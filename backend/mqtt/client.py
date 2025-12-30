@@ -50,9 +50,11 @@ class PrinterConnection:
     def state(self) -> PrinterState:
         return self._state
 
-    def connect(self, on_state_update: Callable[[str, PrinterState], None]):
+    def connect(self, on_state_update: Callable[[str, PrinterState], None], on_disconnect: Optional[Callable[[str], None]] = None, on_connect: Optional[Callable[[str], None]] = None):
         """Connect to printer via MQTT."""
         self._on_state_update = on_state_update
+        self._on_disconnect_callback = on_disconnect
+        self._on_connect_callback = on_connect
         self._loop = asyncio.get_event_loop()
 
         # Create MQTT client
@@ -355,6 +357,13 @@ class PrinterConnection:
 
             # Request full state
             self._send_pushall()
+
+            # Notify connect callback
+            if hasattr(self, '_on_connect_callback') and self._on_connect_callback:
+                if self._loop and self._loop.is_running():
+                    self._loop.call_soon_threadsafe(
+                        lambda: self._on_connect_callback(self.serial)
+                    )
         else:
             logger.error(f"Connection to {self.serial} failed: {reason_code}")
 
@@ -362,6 +371,13 @@ class PrinterConnection:
         """MQTT disconnect callback."""
         self._connected = False
         logger.info(f"Disconnected from printer {self.serial}: {reason_code}")
+
+        # Notify disconnect callback
+        if hasattr(self, '_on_disconnect_callback') and self._on_disconnect_callback:
+            if self._loop and self._loop.is_running():
+                self._loop.call_soon_threadsafe(
+                    lambda: self._on_disconnect_callback(self.serial)
+                )
 
     def _on_message(self, client, userdata, msg):
         """MQTT message callback."""
@@ -435,6 +451,14 @@ class PrinterConnection:
         if "subtask_name" in print_data:
             self._state.subtask_name = print_data["subtask_name"]
 
+        # Extract remaining time (in minutes)
+        if "mc_remaining_time" in print_data:
+            self._state.mc_remaining_time = self._safe_int(print_data["mc_remaining_time"])
+
+        # Extract gcode file path
+        if "gcode_file" in print_data:
+            self._state.gcode_file = print_data["gcode_file"]
+
         # Extract layer info from nested "3D" object or direct fields
         data_3d = print_data.get("3D", {})
         if "layer_num" in data_3d:
@@ -460,6 +484,55 @@ class PrinterConnection:
         if "tray_now" in ams_data:
             tray_now_raw = ams_data["tray_now"]
             self._state.tray_now = self._safe_int(tray_now_raw)
+
+        # Dual-nozzle support: parse device.extruder for H2C/H2D printers
+        device_data = print_data.get("device", {})
+        extruder_data = device_data.get("extruder", {})
+        extruder_info = extruder_data.get("info", [])
+        extruder_state = extruder_data.get("state")
+
+        if extruder_info:
+            # Parse per-extruder tray_now values from 'snow' field
+            # snow is encoded as: (ams_id << 8) | slot_id
+            # We decode it to a global tray index: ams_id * 4 + slot_id
+            for ext_info in extruder_info:
+                ext_id = ext_info.get("id")  # 0=right, 1=left
+                snow = ext_info.get("snow")  # encoded tray_now for this extruder
+                if snow is not None:
+                    snow_int = self._safe_int(snow)
+                    if snow_int is not None and snow_int != 65535 and snow_int != 65279:  # 0xFFFF and 0xFEFF are "no tray"
+                        # Decode: ams_id = high byte, slot_id = low byte
+                        ams_id = (snow_int >> 8) & 0xFF
+                        slot_id = snow_int & 0xFF
+                        # Convert to global tray index (consistent with legacy tray_now)
+                        if ams_id <= 3:
+                            global_tray = ams_id * 4 + slot_id
+                        elif ams_id >= 128:
+                            global_tray = 16 + (ams_id - 128)  # HT uses indices 16+
+                        else:
+                            global_tray = snow_int  # External or unknown
+                        logger.debug(f"[{self.serial}] snow={snow_int} -> ams_id={ams_id}, slot_id={slot_id}, global_tray={global_tray}")
+                        if ext_id == 0:
+                            self._state.tray_now_right = global_tray
+                        elif ext_id == 1:
+                            self._state.tray_now_left = global_tray
+
+        if extruder_state is not None:
+            # Active extruder is in bits 4-7: (state >> 4) & 0xF
+            state_val = self._safe_int(extruder_state)
+            if state_val is not None:
+                self._state.active_extruder = (state_val >> 4) & 0xF
+                logger.debug(f"[{self.serial}] active_extruder={self._state.active_extruder} (from state={state_val})")
+
+        # Log dual-nozzle info if present (now using global tray indices)
+        if self._state.tray_now_left is not None or self._state.tray_now_right is not None:
+            # Convert global indices to readable format for logging
+            def tray_to_name(t):
+                if t is None: return "None"
+                if t >= 16: return f"HT-{chr(65 + t - 16)}"
+                if t >= 254: return "External"
+                return f"{chr(65 + t // 4)}{t % 4 + 1}"  # A1-D4 format
+            logger.info(f"[{self.serial}] Dual-nozzle: L={tray_to_name(self._state.tray_now_left)} R={tray_to_name(self._state.tray_now_right)} active={'L' if self._state.active_extruder == 1 else 'R'}")
 
         # Notify listener
         if self._on_state_update:
@@ -530,6 +603,18 @@ class PrinterConnection:
         """Parse AMS units and trays from MQTT data."""
         if "ams" not in ams_data:
             return
+
+        # Debug: log raw AMS data structure
+        logger.info(f"[{self.serial}] Parsing AMS data with {len(ams_data.get('ams', []))} units")
+        for idx, ams_unit in enumerate(ams_data.get("ams", [])):
+            unit_id = ams_unit.get("id")
+            trays = ams_unit.get("tray", [])
+            logger.info(f"[{self.serial}]   Unit {idx}: id={unit_id}, trays={len(trays)}")
+            for tray in trays:
+                tray_id = tray.get("id")
+                tray_type = tray.get("tray_type")
+                tray_color = tray.get("tray_color")
+                logger.info(f"[{self.serial}]     Tray id={tray_id}: {tray_type} ({tray_color})")
 
         # Build/update AMS extruder map from info field
         # This map persists across updates even when info field is missing
@@ -657,10 +742,20 @@ class PrinterManager:
     def __init__(self):
         self._connections: dict[str, PrinterConnection] = {}
         self._on_state_update: Optional[Callable[[str, PrinterState], None]] = None
+        self._on_disconnect: Optional[Callable[[str], None]] = None
+        self._on_connect: Optional[Callable[[str], None]] = None
 
     def set_state_callback(self, callback: Callable[[str, PrinterState], None]):
         """Set callback for printer state updates."""
         self._on_state_update = callback
+
+    def set_disconnect_callback(self, callback: Callable[[str], None]):
+        """Set callback for printer disconnection."""
+        self._on_disconnect = callback
+
+    def set_connect_callback(self, callback: Callable[[str], None]):
+        """Set callback for printer connection."""
+        self._on_connect = callback
 
     async def connect(self, serial: str, ip_address: str, access_code: str, name: Optional[str] = None):
         """Connect to a printer."""
@@ -676,11 +771,28 @@ class PrinterManager:
         )
 
         try:
-            conn.connect(self._handle_state_update)
+            conn.connect(self._handle_state_update, self._handle_disconnect, self._handle_connect)
             self._connections[serial] = conn
         except Exception as e:
             logger.error(f"Failed to connect to {serial}: {e}")
             raise
+
+    def _handle_connect(self, serial: str):
+        """Handle printer connection."""
+        logger.info(f"Printer {serial} connected successfully")
+        # Notify external callback
+        if self._on_connect:
+            self._on_connect(serial)
+
+    def _handle_disconnect(self, serial: str):
+        """Handle printer disconnection."""
+        logger.info(f"Printer {serial} disconnected")
+        # Remove from connections if still there
+        if serial in self._connections:
+            self._connections.pop(serial, None)
+        # Notify external callback
+        if self._on_disconnect:
+            self._on_disconnect(serial)
 
     async def disconnect(self, serial: str):
         """Disconnect from a printer."""

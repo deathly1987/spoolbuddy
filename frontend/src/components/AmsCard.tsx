@@ -8,13 +8,52 @@ interface AmsCardProps {
   numExtruders?: number;
   printerSerial?: string;
   calibrations?: CalibrationProfile[];
-  trayNow?: number | null; // Currently active tray index
+  trayNow?: number | null; // Legacy single-nozzle: global tray index
+  trayNowLeft?: number | null; // Dual-nozzle: active tray for left nozzle (extruder 1)
+  trayNowRight?: number | null; // Dual-nozzle: active tray for right nozzle (extruder 0)
+  compact?: boolean; // Smaller size for secondary row
 }
 
-// Convert tray_now to tray index within an AMS unit
-// tray_now: 0-3 = AMS A slots, 4-7 = AMS B slots, etc.
-// Returns the tray_id (0-3) if this AMS unit contains the active tray, null otherwise
-function getActiveTrayInUnit(amsId: number, trayNow: number | null): number | null {
+// Get active tray index within an AMS unit
+// For dual-nozzle: uses per-extruder tray_now (converted to global index) based on unit's extruder
+// For single-nozzle: uses global tray_now index
+function getActiveTrayInUnit(
+  unit: AmsUnit,
+  trayNow: number | null,
+  trayNowLeft: number | null,
+  trayNowRight: number | null
+): number | null {
+  const amsId = unit.id;
+  const extruder = unit.extruder;
+
+  // For dual-nozzle printers (when per-extruder values are available)
+  // tray_now_left/right are now global indices (converted by backend)
+  if (trayNowLeft !== null || trayNowRight !== null) {
+    // Determine which tray_now to use based on this AMS unit's extruder assignment
+    const activeTray = extruder === 0 ? trayNowRight : trayNowLeft;
+
+    if (activeTray === null || activeTray === undefined || activeTray === 255 || activeTray >= 254) {
+      return null;
+    }
+
+    // Check if this AMS unit contains the active tray (using global index)
+    if (amsId <= 3) {
+      // Regular AMS: global tray 0-3 = AMS 0, 4-7 = AMS 1, etc.
+      const activeAmsId = Math.floor(activeTray / 4);
+      if (activeAmsId === amsId) {
+        return activeTray % 4;
+      }
+    } else if (amsId >= 128 && amsId <= 135) {
+      // AMS-HT: global tray 16-23 maps to AMS-HT 128-135
+      const htIndex = amsId - 128;
+      if (activeTray === 16 + htIndex) {
+        return 0; // HT only has one slot
+      }
+    }
+    return null;
+  }
+
+  // Legacy single-nozzle: use global tray_now
   if (trayNow === null || trayNow === undefined || trayNow === 255) return null;
 
   if (amsId <= 3) {
@@ -25,7 +64,6 @@ function getActiveTrayInUnit(amsId: number, trayNow: number | null): number | nu
     }
   } else if (amsId >= 128 && amsId <= 135) {
     // AMS-HT: tray_now 16-23 maps to AMS-HT 128-135
-    // Not sure about exact mapping, will need testing
     const htIndex = amsId - 128;
     if (trayNow === 16 + htIndex) {
       return 0; // HT only has one slot
@@ -61,6 +99,23 @@ function trayColorToCSS(color: string | null): string {
   return `#${hex}`;
 }
 
+// Check if a color is too light for text (needs dark text instead)
+function isLightColor(hexColor: string): boolean {
+  // Remove # if present
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  // Calculate relative luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6; // Light if luminance > 60%
+}
+
+// Get contrasting text color for a filament color
+function getTextColor(filamentColor: string): string {
+  return isLightColor(filamentColor) ? "#333333" : filamentColor;
+}
+
 // Check if a tray is empty
 function isTrayEmpty(tray: AmsTray): boolean {
   return !tray.tray_type || tray.tray_type === "";
@@ -80,41 +135,38 @@ function SpoolIcon({ color, isEmpty, size = 32 }: { color: string; isEmpty: bool
   if (isEmpty) {
     return (
       <div
-        class="rounded-full border-2 border-dashed border-gray-500 flex items-center justify-center"
+        class="rounded-full border-2 border-dashed border-[var(--text-muted)] flex items-center justify-center"
         style={{ width: size, height: size }}
       >
-        <div class="w-2 h-2 rounded-full bg-gray-500" />
+        <div class="w-2 h-2 rounded-full bg-[var(--text-muted)]" />
       </div>
     );
   }
 
   return (
     <svg width={size} height={size} viewBox="0 0 32 32">
-      {/* Outer ring */}
-      <circle cx="16" cy="16" r="14" fill={color} />
+      {/* Outer ring with white stroke for visibility */}
+      <circle cx="16" cy="16" r="14" fill={color} stroke="white" strokeWidth="1.5" strokeOpacity="0.7" />
       {/* Inner shadow/depth */}
       <circle cx="16" cy="16" r="11" fill={color} style={{ filter: "brightness(0.85)" }} />
-      {/* Highlight */}
-      <ellipse cx="12" cy="12" rx="4" ry="3" fill="white" opacity="0.3" />
-      {/* Center hole */}
-      <circle cx="16" cy="16" r="5" fill="#2a2a2a" />
-      <circle cx="16" cy="16" r="3" fill="#1a1a1a" />
     </svg>
   );
 }
 
-// Fill level indicator bar
+// Fill level indicator bar - always shown, dimmed if no data
 function FillLevelBar({ remain }: { remain: number | null }) {
-  // Don't show if no data or invalid value
-  if (remain === null || remain === undefined || remain < 0) return null;
-
-  const fillColor = remain > 50 ? "#22c55e" : remain > 20 ? "#f59e0b" : "#ef4444";
+  const hasData = remain !== null && remain !== undefined && remain >= 0;
+  const fillPercent = hasData ? remain : 0;
+  const fillColor = hasData
+    ? (remain! > 50 ? "#22c55e" : remain! > 20 ? "#f59e0b" : "#ef4444")
+    : "transparent";
 
   return (
-    <div class="w-full h-1 bg-gray-700 rounded-full overflow-hidden mt-1">
+    <div class={`w-full h-1 rounded-full overflow-hidden mt-1 ${hasData ? 'bg-[var(--bg-tertiary)]' : 'bg-[var(--bg-tertiary)] opacity-30'}`}
+         style={!hasData ? { backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, var(--text-muted) 2px, var(--text-muted) 4px)' } : {}}>
       <div
         class="h-full rounded-full transition-all"
-        style={{ width: `${remain}%`, backgroundColor: fillColor }}
+        style={{ width: `${fillPercent}%`, backgroundColor: fillColor }}
       />
     </div>
   );
@@ -285,11 +337,14 @@ function SlotMenu({ printerSerial, amsId, trayId, calibrations, currentKValue }:
 }
 
 // Regular AMS card (4 slots)
-function RegularAmsCard({ unit, printerModel, printerSerial, calibrations = [], trayNow }: AmsCardProps) {
+function RegularAmsCard({ unit, printerModel, printerSerial, calibrations = [], trayNow, trayNowLeft, trayNowRight }: AmsCardProps) {
   const amsName = getAmsName(unit.id);
   const humidity = getHumidityDisplay(unit.humidity);
   const humidityStr = formatHumidity(unit.humidity);
   const temperatureStr = formatTemperature(unit.temperature);
+
+  // Get active tray for this AMS unit (handles both single and dual-nozzle)
+  const activeTrayIdx = getActiveTrayInUnit(unit, trayNow ?? null, trayNowLeft ?? null, trayNowRight ?? null);
 
   // Get nozzle label for multi-nozzle printers
   // extruder 0 = Right nozzle, extruder 1 = Left nozzle (per SpoolEase/Bambu convention)
@@ -308,14 +363,13 @@ function RegularAmsCard({ unit, printerModel, printerSerial, calibrations = [], 
   });
 
   const hasControls = !!printerSerial;
-  const activeTrayIdx = getActiveTrayInUnit(unit.id, trayNow ?? null);
 
   return (
-    <div class="relative bg-[#1e1e1e] rounded-lg overflow-hidden" style={{ width: 280 }}>
+    <div class="relative bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg overflow-hidden" style={{ width: 280 }}>
       {/* Header */}
-      <div class="flex items-center justify-between px-3 py-2 bg-[#2a2a2a]">
+      <div class="flex items-center justify-between px-3 py-2 bg-[var(--bg-tertiary)]">
         <div class="flex items-center gap-2">
-          <span class="text-sm font-medium text-gray-200">{amsName}</span>
+          <span class="text-sm font-medium text-[var(--text-primary)]">{amsName}</span>
           {isMultiNozzle && nozzleLabel && (
             <span class={`px-1.5 py-0.5 text-xs rounded ${
               nozzleLabel === "L" ? "bg-blue-600 text-white" : "bg-purple-600 text-white"
@@ -324,63 +378,64 @@ function RegularAmsCard({ unit, printerModel, printerSerial, calibrations = [], 
             </span>
           )}
         </div>
-        <div class="flex items-center gap-2 text-xs text-gray-400">
-          {temperatureStr && (
-            <span title="Temperature">{temperatureStr}</span>
-          )}
-          <div class="flex items-center gap-1" title={`Humidity: ${humidityStr}`}>
-            <img
-              src={`/images/ams/ams_humidity_${humidity.icon}.svg`}
-              alt="Humidity"
-              class="w-4 h-4 opacity-80"
-            />
-            <span>{humidityStr}</span>
-          </div>
+        <div class="flex items-center gap-1 text-xs text-[var(--text-muted)]" title={`Humidity: ${humidityStr}, Temperature: ${temperatureStr || 'N/A'}`}>
+          <span>{humidityStr}</span>
+          <img
+            src={`/images/ams/ams_humidity_${humidity.icon}.svg`}
+            alt="Humidity"
+            class="w-4 h-4 opacity-80"
+          />
+          {temperatureStr && <span>{temperatureStr}</span>}
         </div>
       </div>
 
-      {/* Spool icons row */}
-      <div class="flex justify-around px-2 py-3 bg-[#252525]">
+      {/* AMS unit image with spools overlaid */}
+      <div class="relative ams-image-theme">
+        <img
+          src="/images/ams/ams.png"
+          alt="AMS"
+          class="w-full"
+        />
+        {/* Spool icons overlaid on top of AMS slots - positioned at exact slot locations */}
         {slots.map((tray, idx) => {
           const isEmpty = !tray || isTrayEmpty(tray);
           const color = tray ? trayColorToCSS(tray.tray_color) : "#808080";
           const isActive = activeTrayIdx === idx;
+          // Slot positions as percentage from left (measured from AMS image slot centers)
+          const slotPositions = [21, 40, 60, 79];
           return (
-            <div key={idx} class="flex flex-col items-center">
-              <div class={`rounded-full p-0.5 ${isActive ? "ring-2 ring-green-400 ring-offset-1 ring-offset-[#252525]" : ""}`}>
+            <div
+              key={idx}
+              class="absolute flex flex-col items-center"
+              style={{ left: `${slotPositions[idx]}%`, top: "6%", transform: "translateX(-50%)" }}
+            >
+              <div
+                class={`rounded-full ${isActive ? "ring-2 ring-[var(--accent-color)] ring-offset-1 ring-offset-transparent" : ""}`}
+                style={{ filter: "drop-shadow(0 0 3px rgba(255,255,255,0.8))" }}
+              >
                 <SpoolIcon color={color} isEmpty={isEmpty} size={36} />
               </div>
               {isActive && (
-                <div class="w-1.5 h-1.5 rounded-full bg-green-400 mt-1" title="Active" />
+                <div class="w-1.5 h-1.5 rounded-full bg-[var(--accent-color)] mt-0.5" title="Active" />
               )}
             </div>
           );
         })}
       </div>
 
-      {/* AMS unit image */}
-      <div class="relative">
-        <img
-          src="/images/ams/ams.png"
-          alt="AMS"
-          class="w-full"
-          style={{ filter: "brightness(0.9)" }}
-        />
-      </div>
-
       {/* Material labels with K value and fill level */}
-      <div class="flex justify-around px-2 py-2 bg-[#1a1a1a]">
+      <div class="flex justify-around px-2 py-2 bg-[var(--bg-secondary)]">
         {slots.map((tray, idx) => {
           const isEmpty = !tray || isTrayEmpty(tray);
           const material = tray?.tray_type || "";
-          const color = tray ? trayColorToCSS(tray.tray_color) : "#808080";
+          const textColor = tray ? getTextColor(trayColorToCSS(tray.tray_color)) : "#808080";
           const kValue = tray?.k_value;
           const remain = tray?.remain;
           return (
             <div key={idx} class="flex flex-col items-center" style={{ width: 56 }}>
-              {/* Slot menu button */}
+              {/* Slot menu button - centered */}
               {hasControls && (
-                <div class="self-end mb-0.5">
+                <div class="mb-0.5">
                   <SlotMenu
                     printerSerial={printerSerial!}
                     amsId={unit.id}
@@ -392,21 +447,17 @@ function RegularAmsCard({ unit, printerModel, printerSerial, calibrations = [], 
               )}
               <span
                 class="text-xs font-medium truncate text-center"
-                style={{ color: isEmpty ? "#666" : color, maxWidth: 56 }}
+                style={{ color: isEmpty ? "var(--text-muted)" : textColor, maxWidth: 56 }}
                 title={material}
               >
                 {isEmpty ? "-" : material}
               </span>
-              {!isEmpty && kValue !== null && kValue !== undefined && (
-                <span class="text-[10px] text-gray-500" title="K value (pressure advance)">
-                  K:{kValue.toFixed(3)}
-                </span>
-              )}
+              <span class="text-[10px] text-[var(--text-muted)]" title="K value (pressure advance)">
+                {!isEmpty ? `K:${(kValue ?? 0.020).toFixed(3)}` : "\u00A0"}
+              </span>
+              <FillLevelBar remain={isEmpty ? null : remain ?? null} />
               {!isEmpty && remain !== null && remain !== undefined && remain >= 0 && (
-                <>
-                  <FillLevelBar remain={remain} />
-                  <span class="text-[10px] text-gray-500">{remain}%</span>
-                </>
+                <span class="text-[10px] text-[var(--text-muted)]">{remain}%</span>
               )}
             </div>
           );
@@ -416,8 +467,8 @@ function RegularAmsCard({ unit, printerModel, printerSerial, calibrations = [], 
   );
 }
 
-// HT AMS card (single slot)
-function HtAmsCard({ unit, printerModel, printerSerial, calibrations = [], trayNow }: AmsCardProps) {
+// HT AMS card (single slot) - 50% width of regular AMS
+function HtAmsCard({ unit, printerModel, printerSerial, calibrations = [], trayNow, trayNowLeft, trayNowRight }: AmsCardProps) {
   const amsName = getAmsName(unit.id);
   const humidity = getHumidityDisplay(unit.humidity);
   const humidityStr = formatHumidity(unit.humidity);
@@ -425,169 +476,186 @@ function HtAmsCard({ unit, printerModel, printerSerial, calibrations = [], trayN
   const tray = unit.trays[0];
   const isEmpty = !tray || isTrayEmpty(tray);
   const color = tray ? trayColorToCSS(tray.tray_color) : "#808080";
+  const textColor = tray ? getTextColor(trayColorToCSS(tray.tray_color)) : "#808080";
   const material = tray?.tray_type || "";
   const kValue = tray?.k_value;
   const remain = tray?.remain;
 
   // Get nozzle label for multi-nozzle printers
-  // extruder 0 = Right nozzle, extruder 1 = Left nozzle (per SpoolEase/Bambu convention)
   const nozzleLabel = unit.extruder !== undefined && unit.extruder !== null
     ? (unit.extruder === 0 ? "R" : "L")
     : null;
   const isMultiNozzle = printerModel && ["H2C", "H2D"].includes(printerModel.toUpperCase());
   const hasControls = !!printerSerial;
-  const isActive = getActiveTrayInUnit(unit.id, trayNow ?? null) === 0;
+  const isActive = getActiveTrayInUnit(unit, trayNow ?? null, trayNowLeft ?? null, trayNowRight ?? null) === 0;
 
   return (
-    <div class="relative bg-[#1e1e1e] rounded-lg overflow-hidden" style={{ width: 140 }}>
+    <div class="relative bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg overflow-hidden flex-1 min-w-[180px] max-w-[280px]">
       {/* Header */}
-      <div class="flex items-center justify-between px-3 py-2 bg-[#2a2a2a]">
-        <div class="flex items-center gap-1">
-          <span class="text-xs font-medium text-gray-200">{amsName}</span>
+      <div class="flex items-center justify-between px-3 py-2 bg-[var(--bg-tertiary)]">
+        <div class="flex items-center gap-1.5">
+          <span class="text-sm font-medium text-[var(--text-primary)]">{amsName.replace("AMS ", "")}</span>
           {isMultiNozzle && nozzleLabel && (
-            <span class={`px-1 py-0.5 text-xs rounded ${
+            <span class={`px-1.5 py-0.5 text-[10px] rounded ${
               nozzleLabel === "L" ? "bg-blue-600 text-white" : "bg-purple-600 text-white"
             }`}>
               {nozzleLabel}
             </span>
           )}
         </div>
-        <div class="flex items-center gap-1 text-[10px] text-gray-400">
-          {temperatureStr && (
-            <span title="Temperature">{temperatureStr}</span>
+        <div class="flex items-center gap-1 text-xs text-[var(--text-muted)]" title={`Humidity: ${humidityStr}, Temperature: ${temperatureStr || 'N/A'}`}>
+          <span>{humidityStr}</span>
+          <img
+            src={`/images/ams/ams_humidity_${humidity.icon}.svg`}
+            alt="Humidity"
+            class="w-4 h-4 opacity-80"
+          />
+          {temperatureStr && <span>{temperatureStr}</span>}
+        </div>
+      </div>
+
+      {/* Spool icon and info */}
+      <div class="flex gap-3 p-3 bg-[var(--bg-primary)]">
+        {/* Left: Spool icon */}
+        <div class="flex flex-col items-center">
+          <div class={`rounded-full p-0.5 ${isActive ? "ring-2 ring-[var(--accent-color)] ring-offset-1 ring-offset-[var(--bg-primary)]" : ""}`}>
+            <SpoolIcon color={color} isEmpty={isEmpty} size={48} />
+          </div>
+          {isActive && (
+            <div class="w-1.5 h-1.5 rounded-full bg-[var(--accent-color)] mt-1" title="Active" />
           )}
-          <div class="flex items-center gap-0.5" title={`Humidity: ${humidityStr}`}>
-            <img
-              src={`/images/ams/ams_humidity_${humidity.icon}.svg`}
-              alt="Humidity"
-              class="w-3 h-3 opacity-80"
-            />
-            <span>{humidityStr}</span>
+        </div>
+
+        {/* Right: Material info */}
+        <div class="flex-1 flex flex-col justify-center min-w-0">
+          <div class="flex items-center justify-between gap-2">
+            <span
+              class="text-sm font-medium truncate"
+              style={{ color: isEmpty ? "var(--text-muted)" : textColor }}
+              title={material}
+            >
+              {isEmpty ? "Empty" : material}
+            </span>
+            {hasControls && (
+              <SlotMenu
+                printerSerial={printerSerial!}
+                amsId={unit.id}
+                trayId={0}
+                calibrations={calibrations}
+                currentKValue={kValue ?? null}
+              />
+            )}
+          </div>
+          {!isEmpty && kValue !== null && kValue !== undefined && (
+            <span class="text-xs text-[var(--text-muted)]" title="K value (pressure advance)">
+              K:{kValue.toFixed(3)}
+            </span>
+          )}
+          <div class="mt-1.5">
+            <FillLevelBar remain={isEmpty ? null : remain ?? null} />
+            {!isEmpty && remain !== null && remain !== undefined && remain >= 0 && (
+              <span class="text-[10px] text-[var(--text-muted)]">{remain}%</span>
+            )}
           </div>
         </div>
-      </div>
-
-      {/* Spool icon */}
-      <div class="flex flex-col items-center justify-center py-2 bg-[#252525]">
-        <div class={`rounded-full p-0.5 ${isActive ? "ring-2 ring-green-400 ring-offset-1 ring-offset-[#252525]" : ""}`}>
-          <SpoolIcon color={color} isEmpty={isEmpty} size={40} />
-        </div>
-        {isActive && (
-          <div class="w-1.5 h-1.5 rounded-full bg-green-400 mt-1" title="Active" />
-        )}
-      </div>
-
-      {/* AMS HT image */}
-      <div class="relative flex justify-center">
-        <img
-          src="/images/ams/amsht.png"
-          alt="AMS HT"
-          class="h-32 object-contain"
-          style={{ filter: "brightness(0.9)" }}
-        />
-      </div>
-
-      {/* Material label with K value and fill level */}
-      <div class="flex flex-col items-center px-2 py-2 bg-[#1a1a1a]">
-        {/* Slot menu button */}
-        {hasControls && (
-          <div class="self-end mb-0.5">
-            <SlotMenu
-              printerSerial={printerSerial!}
-              amsId={unit.id}
-              trayId={0}
-              calibrations={calibrations}
-              currentKValue={kValue ?? null}
-            />
-          </div>
-        )}
-        <span
-          class="text-xs font-medium truncate"
-          style={{ color: isEmpty ? "#666" : color }}
-          title={material}
-        >
-          {isEmpty ? "-" : material}
-        </span>
-        {!isEmpty && kValue !== null && kValue !== undefined && (
-          <span class="text-[10px] text-gray-500" title="K value (pressure advance)">
-            K:{kValue.toFixed(3)}
-          </span>
-        )}
-        {!isEmpty && remain !== null && remain !== undefined && remain >= 0 && (
-          <div class="w-full mt-1">
-            <FillLevelBar remain={remain} />
-            <span class="text-[10px] text-gray-500 block text-center mt-0.5">{remain}%</span>
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
-export function AmsCard({ unit, printerModel, numExtruders = 1, printerSerial, calibrations = [], trayNow }: AmsCardProps) {
+export function AmsCard({ unit, printerModel, numExtruders = 1, printerSerial, calibrations = [], trayNow, trayNowLeft, trayNowRight }: AmsCardProps) {
   const isHt = isHtAms(unit.id);
 
   if (isHt) {
-    return <HtAmsCard unit={unit} printerModel={printerModel} numExtruders={numExtruders} printerSerial={printerSerial} calibrations={calibrations} trayNow={trayNow} />;
+    return <HtAmsCard unit={unit} printerModel={printerModel} numExtruders={numExtruders} printerSerial={printerSerial} calibrations={calibrations} trayNow={trayNow} trayNowLeft={trayNowLeft} trayNowRight={trayNowRight} />;
   }
 
-  return <RegularAmsCard unit={unit} printerModel={printerModel} numExtruders={numExtruders} printerSerial={printerSerial} calibrations={calibrations} trayNow={trayNow} />;
+  return <RegularAmsCard unit={unit} printerModel={printerModel} numExtruders={numExtruders} printerSerial={printerSerial} calibrations={calibrations} trayNow={trayNow} trayNowLeft={trayNowLeft} trayNowRight={trayNowRight} />;
 }
 
-// External spool holder (Virtual Tray)
+// External spool holder (Virtual Tray) - 50% width of regular AMS
 interface ExternalSpoolProps {
   tray: AmsTray | null;
-  position?: "left" | "right";
+  position?: "left" | "right";  // left = Ext-1/L nozzle, right = Ext-2/R nozzle
   numExtruders?: number;
   printerSerial?: string;
   calibrations?: CalibrationProfile[];
 }
 
-export function ExternalSpool({ tray, position, numExtruders = 1, printerSerial, calibrations = [] }: ExternalSpoolProps) {
-  if (!tray || isTrayEmpty(tray)) {
-    return null;
-  }
+export function ExternalSpool({ tray, position = "left", numExtruders = 1, printerSerial, calibrations = [] }: ExternalSpoolProps) {
+  const isEmpty = !tray || isTrayEmpty(tray);
+  const color = tray ? trayColorToCSS(tray.tray_color) : "#808080";
+  const textColor = tray ? getTextColor(trayColorToCSS(tray.tray_color)) : "#808080";
+  const material = tray?.tray_type || "";
 
-  const color = trayColorToCSS(tray.tray_color);
+  // For single extruder: just "Ext-1"
+  // For multi-nozzle: Ext-1 = left/L nozzle, Ext-2 = right/R nozzle
   const label = numExtruders === 1
-    ? "External"
-    : (position === "left" ? "External L" : "External R");
-  const kValue = tray.k_value;
-  const remain = tray.remain;
+    ? "Ext-1"
+    : (position === "left" ? "Ext-1" : "Ext-2");
+  const nozzleLabel = numExtruders > 1 ? (position === "left" ? "L" : "R") : null;
+
+  const kValue = tray?.k_value;
+  const remain = tray?.remain;
   const hasControls = !!printerSerial;
   // External tray uses ams_id 255 (or 254 for left on dual nozzle)
   const amsId = numExtruders === 1 ? 255 : (position === "left" ? 254 : 255);
 
   return (
-    <div class="bg-[#1e1e1e] rounded-lg overflow-hidden" style={{ width: 100 }}>
-      <div class="px-2 py-1.5 bg-[#2a2a2a] flex items-center justify-between">
-        <span class="text-xs font-medium text-gray-200">{label}</span>
-        {hasControls && (
-          <SlotMenu
-            printerSerial={printerSerial!}
-            amsId={amsId}
-            trayId={0}
-            calibrations={calibrations}
-            currentKValue={kValue ?? null}
-          />
-        )}
+    <div class="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg overflow-hidden flex-1 min-w-[180px] max-w-[280px]">
+      {/* Header */}
+      <div class="flex items-center justify-between px-3 py-2 bg-[var(--bg-tertiary)]">
+        <div class="flex items-center gap-1.5">
+          <span class="text-sm font-medium text-[var(--text-primary)]">{label}</span>
+          {nozzleLabel && (
+            <span class={`px-1.5 py-0.5 text-[10px] rounded ${
+              nozzleLabel === "L" ? "bg-blue-600 text-white" : "bg-purple-600 text-white"
+            }`}>
+              {nozzleLabel}
+            </span>
+          )}
+        </div>
       </div>
-      <div class="flex flex-col items-center py-3 gap-1 px-2">
-        <SpoolIcon color={color} isEmpty={false} size={44} />
-        <span class="text-xs font-medium" style={{ color }}>
-          {tray.tray_type}
-        </span>
-        {kValue !== null && kValue !== undefined && (
-          <span class="text-[10px] text-gray-500" title="K value (pressure advance)">
-            K:{kValue.toFixed(3)}
-          </span>
-        )}
-        {remain !== null && remain !== undefined && remain >= 0 && (
-          <div class="w-full">
-            <FillLevelBar remain={remain} />
-            <span class="text-[10px] text-gray-500 block text-center mt-0.5">{remain}%</span>
+
+      {/* Spool icon and info */}
+      <div class="flex gap-3 p-3 bg-[var(--bg-primary)]">
+        {/* Left: Spool icon */}
+        <div class="flex flex-col items-center">
+          <SpoolIcon color={color} isEmpty={isEmpty} size={48} />
+        </div>
+
+        {/* Right: Material info */}
+        <div class="flex-1 flex flex-col justify-center min-w-0">
+          <div class="flex items-center justify-between gap-2">
+            <span
+              class="text-sm font-medium truncate"
+              style={{ color: isEmpty ? "var(--text-muted)" : textColor }}
+              title={material}
+            >
+              {isEmpty ? "Empty" : material}
+            </span>
+            {hasControls && (
+              <SlotMenu
+                printerSerial={printerSerial!}
+                amsId={amsId}
+                trayId={0}
+                calibrations={calibrations}
+                currentKValue={kValue ?? null}
+              />
+            )}
           </div>
-        )}
+          {!isEmpty && kValue !== null && kValue !== undefined && (
+            <span class="text-xs text-[var(--text-muted)]" title="K value (pressure advance)">
+              K:{kValue.toFixed(3)}
+            </span>
+          )}
+          <div class="mt-1.5">
+            <FillLevelBar remain={isEmpty ? null : remain ?? null} />
+            {!isEmpty && remain !== null && remain !== undefined && remain >= 0 && (
+              <span class="text-[10px] text-[var(--text-muted)]">{remain}%</span>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

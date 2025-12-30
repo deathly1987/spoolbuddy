@@ -1,26 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* CSS Variables for theming - Light mode (default) */
-/* Based on Bambuddy UI reference */
+/* Matched to Bambuddy UI */
 :root {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f5f5f5;
-  --bg-tertiary: #e8e8e8;
-  --bg-header: #00ae42;
-  --bg-header-hover: rgba(255, 255, 255, 0.1);
+  --bg-primary: #f5f5f5;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e5e5e5;
+  --bg-header: #ffffff;
+  --bg-header-hover: rgba(0, 0, 0, 0.05);
   --bg-header-active: rgba(0, 0, 0, 0.1);
+  --header-text: #1a1a1a;
+  --header-text-muted: #6b6b6b;
   --text-primary: #1a1a1a;
-  --text-secondary: #666666;
-  --text-muted: #999999;
-  --border-color: #e0e0e0;
+  --text-secondary: #4a4a4a;
+  --text-muted: #6b6b6b;
+  --text-tertiary: #808080;
+  --border-color: #d4d4d4;
   --accent-color: #00ae42;
   --accent-hover: #009639;
   --success-color: #22c55e;
   --warning-color: #f59e0b;
   --error-color: #ef4444;
   --info-color: #3b82f6;
+
+  font-family: 'Inter', system-ui, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 
   /* Badge colors */
   --badge-printer-bg: #dbeafe;
@@ -47,20 +60,23 @@
   --radius-lg: 12px;
 }
 
-/* Dark mode - Based on Bambuddy/BambuLab dark theme */
+/* Dark mode - Matched to Bambuddy */
 .dark {
-  --bg-primary: #1e1e1e;
-  --bg-secondary: #121212;
-  --bg-tertiary: #2a2a2a;
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --bg-tertiary: #3d3d3d;
   --bg-header: #1a1a1a;
   --bg-header-hover: rgba(255, 255, 255, 0.1);
   --bg-header-active: rgba(255, 255, 255, 0.15);
+  --header-text: #ffffff;
+  --header-text-muted: #a0a0a0;
   --text-primary: #ffffff;
   --text-secondary: #a0a0a0;
-  --text-muted: #707070;
-  --border-color: #3a3a3a;
+  --text-muted: #808080;
+  --text-tertiary: #4a4a4a;
+  --border-color: #3d3d3d;
   --accent-color: #00ae42;
-  --accent-hover: #00c94b;
+  --accent-hover: #00c64d;
   --success-color: #22c55e;
   --warning-color: #f59e0b;
   --error-color: #ef4444;
@@ -84,12 +100,6 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-}
-
-/* Apply dark mode to body */
-.dark body {
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
 }
 
 /* Custom scrollbar for webkit browsers */
@@ -499,4 +509,115 @@
 
 .animate-slide-in {
   animation: slideIn 0.3s ease;
+}
+
+/* Mobile drawer animation */
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.3s ease-out;
+}
+
+/* Theme-aware icon inversion - only invert in dark mode */
+.icon-theme {
+  opacity: 0.5;
+}
+
+.dark .icon-theme {
+  filter: invert(1);
+  opacity: 0.4;
+}
+
+/* Green-colored icon for active status indicators */
+.icon-green {
+  filter: invert(48%) sepia(89%) saturate(459%) hue-rotate(93deg) brightness(95%) contrast(92%);
+  opacity: 1;
+}
+
+/* Orange/red-colored icon for heating indicators */
+.icon-heating {
+  filter: invert(50%) sepia(100%) saturate(1000%) hue-rotate(360deg) brightness(100%) contrast(100%);
+  opacity: 1;
+}
+
+/* Empty AMS slot with diagonal stripes */
+.ams-empty-slot {
+  background: repeating-linear-gradient(
+    45deg,
+    #bbb,
+    #bbb 2px,
+    #999 2px,
+    #999 4px
+  );
+}
+
+.dark .ams-empty-slot {
+  background: repeating-linear-gradient(
+    45deg,
+    #555,
+    #555 2px,
+    #333 2px,
+    #333 4px
+  );
+}
+
+/* AMS image theme adjustment - invert in light mode since images are dark */
+.ams-image-theme {
+  /* Light mode - leave as-is, dark images work on light bg */
+}
+
+.dark .ams-image-theme {
+  /* Dark mode - slightly brighten */
+  filter: brightness(0.9);
+}
+
+/* Touch manipulation to prevent zoom on double-tap */
+.touch-manipulation {
+  touch-action: manipulation;
+}
+
+/* Safe area insets for notched devices */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Smooth transitions for theme changes */
+.bg-bambu-dark,
+.bg-bambu-dark-secondary,
+.bg-bambu-dark-tertiary,
+.border-bambu-dark-tertiary {
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  margin: 0;
+  min-height: 100vh;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+#root {
+  min-height: 100vh;
 }

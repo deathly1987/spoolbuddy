@@ -6,6 +6,32 @@ import { useToast } from "../lib/toast";
 
 const EXPANDED_PRINTERS_KEY = "spoolbuddy-expanded-printers";
 
+// Format remaining time in minutes to human readable
+function formatRemainingTime(minutes: number | null): string {
+  if (minutes === null || minutes === undefined || minutes < 0) return "";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours < 24) return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+}
+
+// Calculate ETA from remaining minutes
+function calculateETA(minutes: number | null): string {
+  if (minutes === null || minutes === undefined || minutes < 0) return "";
+  const eta = new Date(Date.now() + minutes * 60 * 1000);
+  const now = new Date();
+  const isToday = eta.toDateString() === now.toDateString();
+  const isTomorrow = eta.toDateString() === new Date(Date.now() + 86400000).toDateString();
+
+  const timeStr = eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (isToday) return timeStr;
+  if (isTomorrow) return `Tomorrow ${timeStr}`;
+  return eta.toLocaleDateString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
 // Load expanded state from localStorage
 function loadExpandedPrinters(): Set<string> {
   try {
@@ -138,6 +164,9 @@ export function Printers() {
     try {
       await api.connectPrinter(serial);
       showToast('success', `Connected to "${printer?.name || serial}"`);
+      // Clear connecting state and reload printers to get updated status
+      setConnecting(null);
+      await loadPrinters();
     } catch (e) {
       console.error("Failed to connect:", e);
       setConnecting(null);
@@ -340,24 +369,61 @@ export function Printers() {
                   {isExpanded && (
                     <>
                       {/* AMS Section - shown when connected */}
-                      {connected && state && state.ams_units && state.ams_units.length > 0 && (
+                      {connected && state && (
                         <div class="mt-4 pt-4 border-t border-[var(--border-color)]">
-                          <div class="flex flex-wrap gap-3">
-                            {state.ams_units.map((unit) => (
-                              <AmsCard
-                                key={unit.id}
-                                unit={unit}
-                                printerModel={printer.model || undefined}
-                                numExtruders={isMultiNozzle ? 2 : 1}
-                                printerSerial={printer.serial}
-                                calibrations={calibrations[printer.serial] || []}
-                                trayNow={state.tray_now}
-                              />
-                            ))}
-                            {state.vt_tray && (
+                          {/* Top row: Regular AMS units (id 0-3) */}
+                          {state.ams_units && state.ams_units.filter(u => u.id <= 3).length > 0 && (
+                            <div class="flex flex-wrap gap-3 mb-3">
+                              {state.ams_units
+                                .filter(unit => unit.id <= 3)
+                                .sort((a, b) => a.id - b.id)
+                                .map((unit) => (
+                                  <AmsCard
+                                    key={unit.id}
+                                    unit={unit}
+                                    printerModel={printer.model || undefined}
+                                    numExtruders={isMultiNozzle ? 2 : 1}
+                                    printerSerial={printer.serial}
+                                    calibrations={calibrations[printer.serial] || []}
+                                    trayNow={state.tray_now}
+                                    trayNowLeft={state.tray_now_left}
+                                    trayNowRight={state.tray_now_right}
+                                  />
+                                ))}
+                            </div>
+                          )}
+                          {/* Bottom row: AMS-HT units (id 128+) and External slots */}
+                          <div class="flex flex-wrap gap-3 items-start">
+                            {state.ams_units && state.ams_units
+                              .filter(unit => unit.id >= 128)
+                              .sort((a, b) => a.id - b.id)
+                              .map((unit) => (
+                                <AmsCard
+                                  key={unit.id}
+                                  unit={unit}
+                                  printerModel={printer.model || undefined}
+                                  numExtruders={isMultiNozzle ? 2 : 1}
+                                  printerSerial={printer.serial}
+                                  calibrations={calibrations[printer.serial] || []}
+                                  trayNow={state.tray_now}
+                                  trayNowLeft={state.tray_now_left}
+                                  trayNowRight={state.tray_now_right}
+                                />
+                              ))}
+                            {/* Ext-1 (L nozzle for multi-nozzle) */}
+                            <ExternalSpool
+                              tray={state.vt_tray}
+                              position="left"
+                              numExtruders={isMultiNozzle ? 2 : 1}
+                              printerSerial={printer.serial}
+                              calibrations={calibrations[printer.serial] || []}
+                            />
+                            {/* Ext-2 (R nozzle) for multi-nozzle printers */}
+                            {isMultiNozzle && (
                               <ExternalSpool
-                                tray={state.vt_tray}
-                                numExtruders={isMultiNozzle ? 2 : 1}
+                                tray={null}
+                                position="right"
+                                numExtruders={2}
                                 printerSerial={printer.serial}
                                 calibrations={calibrations[printer.serial] || []}
                               />
@@ -369,33 +435,59 @@ export function Printers() {
                       {/* Print status - shown when printing */}
                       {connected && state && state.gcode_state && state.gcode_state !== "IDLE" && (
                         <div class="mt-3 pt-3 border-t border-[var(--border-color)]">
-                          <div class="flex items-center gap-4">
-                            <div class="flex-1">
-                              <div class="flex items-center justify-between text-sm">
-                                <span class="text-[var(--text-secondary)]">{state.subtask_name || "Printing"}</span>
-                                <span class="font-medium text-[var(--text-primary)]">{state.print_progress ?? 0}%</span>
-                              </div>
-                              <div class="mt-1 w-full bg-[var(--bg-tertiary)] rounded-full h-2">
-                                <div
-                                  class="bg-[var(--accent-color)] h-2 rounded-full transition-all duration-300"
-                                  style={{ width: `${state.print_progress ?? 0}%` }}
-                                />
-                              </div>
-                              {state.layer_num !== null && state.total_layer_num !== null && (
-                                <p class="text-xs text-[var(--text-muted)] mt-1">
-                                  Layer {state.layer_num} / {state.total_layer_num}
-                                </p>
-                              )}
+                          <div class="flex gap-4">
+                            {/* Thumbnail placeholder */}
+                            <div class="flex-shrink-0 w-16 h-16 bg-[var(--bg-tertiary)] rounded-lg flex items-center justify-center">
+                              <svg class="w-8 h-8 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
                             </div>
-                            <span class={`text-xs px-2 py-1 rounded-full ${
-                              state.gcode_state === "RUNNING" ? "bg-blue-100 text-blue-700" :
-                              state.gcode_state === "PAUSE" ? "bg-yellow-100 text-yellow-700" :
-                              state.gcode_state === "FINISH" ? "bg-green-100 text-green-700" :
-                              state.gcode_state === "FAILED" ? "bg-red-100 text-red-700" :
-                              "bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
-                            }`}>
-                              {state.gcode_state}
-                            </span>
+
+                            {/* Print info */}
+                            <div class="flex-1 min-w-0">
+                              <div class="flex items-center justify-between gap-2">
+                                <span class="text-sm font-medium text-[var(--text-primary)] truncate">
+                                  {state.subtask_name || "Printing"}
+                                </span>
+                                <span class={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
+                                  state.gcode_state === "RUNNING" ? "bg-blue-100 text-blue-700" :
+                                  state.gcode_state === "PAUSE" ? "bg-yellow-100 text-yellow-700" :
+                                  state.gcode_state === "FINISH" ? "bg-green-100 text-green-700" :
+                                  state.gcode_state === "FAILED" ? "bg-red-100 text-red-700" :
+                                  "bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
+                                }`}>
+                                  {state.gcode_state}
+                                </span>
+                              </div>
+
+                              {/* Progress bar */}
+                              <div class="mt-1.5 flex items-center gap-2">
+                                <div class="flex-1 bg-[var(--bg-tertiary)] rounded-full h-2">
+                                  <div
+                                    class="bg-[var(--accent-color)] h-2 rounded-full transition-all duration-300"
+                                    style={{ width: `${state.print_progress ?? 0}%` }}
+                                  />
+                                </div>
+                                <span class="text-sm font-medium text-[var(--text-primary)] w-10 text-right">
+                                  {state.print_progress ?? 0}%
+                                </span>
+                              </div>
+
+                              {/* Details row */}
+                              <div class="mt-1.5 flex items-center gap-3 text-xs text-[var(--text-muted)]">
+                                {state.layer_num !== null && state.total_layer_num !== null && (
+                                  <span>Layer {state.layer_num}/{state.total_layer_num}</span>
+                                )}
+                                {state.mc_remaining_time !== null && state.mc_remaining_time > 0 && (
+                                  <>
+                                    <span>•</span>
+                                    <span>{formatRemainingTime(state.mc_remaining_time)} left</span>
+                                    <span>•</span>
+                                    <span>ETA {calculateETA(state.mc_remaining_time)}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
                       )}
