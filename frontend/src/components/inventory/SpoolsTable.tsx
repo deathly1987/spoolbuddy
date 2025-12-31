@@ -15,7 +15,7 @@ import { SpoolCard } from './SpoolCard'
 import { WeightProgress } from './ProgressBar'
 import { PrinterBadge, KBadge, OriginBadge } from './Badge'
 import { getNetWeight, getGrossWeight, compareWeights, formatWeight, getFilamentName } from './utils'
-import { ChevronUp, ChevronDown, Search, Check, AlertTriangle, Trash2, Columns } from 'lucide-preact'
+import { ChevronUp, ChevronDown, Search, Check, AlertTriangle, Columns } from 'lucide-preact'
 import { ColumnConfig } from './ColumnConfigModal'
 
 const columnHelper = createColumnHelper<Spool>()
@@ -51,7 +51,6 @@ interface SpoolsTableProps {
   spools: Spool[]
   spoolsInPrinters?: SpoolsInPrinters
   onEditSpool?: (spool: Spool) => void
-  onDeleteSpool?: (spool: Spool) => void
   columnConfig?: ColumnConfig[]
   onOpenColumns?: () => void
 }
@@ -60,7 +59,6 @@ export function SpoolsTable({
   spools,
   spoolsInPrinters = {},
   onEditSpool,
-  onDeleteSpool,
   columnConfig,
   onOpenColumns
 }: SpoolsTableProps) {
@@ -85,20 +83,22 @@ export function SpoolsTable({
   // All available column definitions
   const allColumnDefs = useMemo(
     () => [
-      // ID (required)
-      columnHelper.accessor('id', {
-        header: 'ID',
-        cell: (info) => <span class="font-medium">{info.getValue() || '-'}</span>,
+      // ID (spool number)
+      columnHelper.accessor('spool_number', {
+        id: 'id',
+        header: '#',
+        cell: (info) => <span class="font-medium">{info.getValue() ?? '-'}</span>,
         size: 50,
       }),
-      // Added
-      columnHelper.accessor('added_time', {
+      // Added (use created_at as fallback)
+      columnHelper.accessor((row) => row.added_time || row.created_at, {
         id: 'added_time',
         header: 'Added',
         cell: (info) => {
           const value = info.getValue()
           if (!value) return <span class="text-[var(--text-muted)]">-</span>
-          const date = new Date(parseInt(value) * 1000)
+          const timestamp = typeof value === 'string' ? parseInt(value) : value
+          const date = new Date(timestamp * 1000)
           return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
         },
         size: 90,
@@ -162,19 +162,25 @@ export function SpoolsTable({
         header: 'Slicer Filament',
         cell: (info) => {
           const code = info.getValue()
+          const spool = info.row.original
           if (!code) return <span class="text-[var(--text-muted)]">-</span>
-          const name = getFilamentName(code)
+          // Prefer stored name, fallback to lookup, then code
+          const name = spool.slicer_filament_name || getFilamentName(code)
           return <span title={code}>{name}</span>
         },
         size: 150,
       }),
-      // Location
-      columnHelper.accessor((row) => spoolsInPrinters[row.id] || '', {
+      // Location (printer/AMS if loaded, otherwise storage location)
+      columnHelper.accessor((row) => spoolsInPrinters[row.id] || row.location || '', {
         id: 'location',
         header: 'Location',
         cell: (info) => {
-          const location = info.getValue()
-          return location ? <PrinterBadge location={location} /> : <span class="text-[var(--text-muted)]">-</span>
+          const spool = info.row.original
+          const printerLocation = spoolsInPrinters[spool.id]
+          if (printerLocation) {
+            return <PrinterBadge location={printerLocation} />
+          }
+          return spool.location ? <span>{spool.location}</span> : <span class="text-[var(--text-muted)]">-</span>
         },
         size: 120,
       }),
@@ -331,26 +337,8 @@ export function SpoolsTable({
         },
         size: 80,
       }),
-      // Actions (required)
-      columnHelper.display({
-        id: 'actions',
-        header: '',
-        cell: (info) => (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onDeleteSpool?.(info.row.original)
-            }}
-            class="p-1.5 rounded hover:bg-[var(--error-color)]/10 text-[var(--text-muted)] hover:text-[var(--error-color)] transition-colors"
-            title="Delete spool"
-          >
-            <Trash2 class="w-4 h-4" />
-          </button>
-        ),
-        size: 50,
-      }),
     ],
-    [spoolsInPrinters, onDeleteSpool]
+    [spoolsInPrinters]
   )
 
   // Apply column configuration (visibility and order)
@@ -366,10 +354,14 @@ export function SpoolsTable({
     )
 
     // Filter and order based on config
-    return columnConfig
-      .filter(cfg => cfg.visible)
-      .map(cfg => columnDefsMap.get(cfg.id))
-      .filter((col): col is ColumnDef<Spool, unknown> => col !== undefined)
+    const result: ColumnDef<Spool, any>[] = []
+    for (const cfg of columnConfig) {
+      if (cfg.visible) {
+        const col = columnDefsMap.get(cfg.id)
+        if (col) result.push(col)
+      }
+    }
+    return result
   }, [allColumnDefs, columnConfig])
 
   const table = useReactTable({

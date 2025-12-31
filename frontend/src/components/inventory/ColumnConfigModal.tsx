@@ -17,9 +17,9 @@ interface ColumnConfigModalProps {
 
 const defaultColumns: ColumnConfig[] = [
   // Required
-  { id: 'id', label: 'ID', visible: true },
+  { id: 'id', label: '#', visible: true },
   // Date columns
-  { id: 'added_time', label: 'Added', visible: false },
+  { id: 'added_time', label: 'Added', visible: true },
   { id: 'encode_time', label: 'Encoded', visible: false },
   // Visual/Identity
   { id: 'rgba', label: 'Color', visible: true },
@@ -46,8 +46,6 @@ const defaultColumns: ColumnConfig[] = [
   // Extra visual columns
   { id: 'remaining', label: 'Remaining', visible: true },
   { id: 'scale', label: 'Scale', visible: false },
-  // Required
-  { id: 'actions', label: 'Actions', visible: true },
 ]
 
 export function getDefaultColumns(): ColumnConfig[] {

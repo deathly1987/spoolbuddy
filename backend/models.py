@@ -17,9 +17,12 @@ class SpoolBase(BaseModel):
     weight_new: Optional[int] = None
     weight_current: Optional[int] = None
     slicer_filament: Optional[str] = None
+    slicer_filament_name: Optional[str] = None
+    location: Optional[str] = None
     note: Optional[str] = None
     data_origin: Optional[str] = None
     tag_type: Optional[str] = None
+    ext_has_k: Optional[bool] = False
 
 
 class SpoolCreate(SpoolBase):
@@ -32,6 +35,7 @@ class SpoolUpdate(SpoolBase):
 
 class Spool(SpoolBase):
     id: str
+    spool_number: Optional[int] = None
     added_time: Optional[int] = None
     encode_time: Optional[int] = None
     added_full: Optional[int] = 0

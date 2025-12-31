@@ -18,6 +18,23 @@ class LogUsageRequest(BaseModel):
     printer_serial: Optional[str] = None
 
 
+class KProfileInput(BaseModel):
+    """K-profile to associate with a spool."""
+    printer_serial: str
+    extruder: Optional[int] = None
+    nozzle_diameter: Optional[str] = None
+    nozzle_type: Optional[str] = None
+    k_value: str
+    name: Optional[str] = None
+    cali_idx: Optional[int] = None
+    setting_id: Optional[str] = None
+
+
+class SaveKProfilesRequest(BaseModel):
+    """Request to save K-profiles for a spool."""
+    profiles: list[KProfileInput]
+
+
 router = APIRouter(prefix="/spools", tags=["spools"])
 
 
@@ -142,3 +159,30 @@ async def get_all_usage_history(limit: int = Query(default=100, le=500)):
     """
     db = await get_db()
     return await db.get_usage_history(limit=limit)
+
+
+@router.get("/{spool_id}/k-profiles")
+async def get_spool_k_profiles(spool_id: str):
+    """Get K-profiles associated with a spool."""
+    db = await get_db()
+
+    spool = await db.get_spool(spool_id)
+    if not spool:
+        raise HTTPException(status_code=404, detail="Spool not found")
+
+    return await db.get_spool_k_profiles(spool_id)
+
+
+@router.put("/{spool_id}/k-profiles")
+async def save_spool_k_profiles(spool_id: str, request: SaveKProfilesRequest):
+    """Save K-profiles for a spool (replaces existing)."""
+    db = await get_db()
+
+    spool = await db.get_spool(spool_id)
+    if not spool:
+        raise HTTPException(status_code=404, detail="Spool not found")
+
+    profiles = [p.model_dump() for p in request.profiles]
+    await db.save_spool_k_profiles(spool_id, profiles)
+
+    return {"status": "ok", "count": len(profiles)}

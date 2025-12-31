@@ -171,7 +171,8 @@
 }
 
 .btn-danger:hover {
-  opacity: 0.9;
+  background: color-mix(in srgb, var(--error-color) 85%, black);
+  border-color: color-mix(in srgb, var(--error-color) 85%, black);
 }
 
 .btn-icon {

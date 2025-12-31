@@ -2,6 +2,7 @@ const API_BASE = "/api";
 
 export interface Spool {
   id: string;
+  spool_number: number | null;
   tag_id: string | null;
   material: string;
   subtype: string | null;
@@ -13,6 +14,8 @@ export interface Spool {
   weight_new: number | null;
   weight_current: number | null;
   slicer_filament: string | null;
+  slicer_filament_name: string | null;
+  location: string | null;
   note: string | null;
   added_time: string | null;  // Unix timestamp as string for compat
   encode_time: string | null; // Unix timestamp as string for compat
@@ -42,6 +45,8 @@ export interface SpoolInput {
   weight_new?: number | null;
   weight_current?: number | null;
   slicer_filament?: string | null;
+  slicer_filament_name?: string | null;
+  location?: string | null;
   note?: string | null;
   data_origin?: string | null;
   tag_type?: string | null;
@@ -91,6 +96,21 @@ export interface CalibrationProfile {
   name: string;
   nozzle_diameter: string | null;
   extruder_id?: number;  // 0=right, 1=left (for dual nozzle printers)
+}
+
+// K-profile stored with spool
+export interface SpoolKProfile {
+  id?: number;
+  spool_id?: string;
+  printer_serial: string;
+  extruder: number | null;
+  nozzle_diameter: string | null;
+  nozzle_type: string | null;
+  k_value: string;
+  name: string | null;
+  cali_idx: number | null;
+  setting_id: string | null;
+  created_at?: number;
 }
 
 export interface DeviceStatus {
@@ -215,6 +235,20 @@ export interface ESP32RecoveryInfo {
   firmware_url: string | null;
 }
 
+// Spool catalog types
+export interface CatalogEntry {
+  id: number;
+  name: string;
+  weight: number;
+  is_default: boolean;
+  created_at: number | null;
+}
+
+export interface CatalogEntryInput {
+  name: string;
+  weight: number;
+}
+
 class ApiClient {
   private async request<T>(
     path: string,
@@ -283,6 +317,18 @@ class ApiClient {
   async deleteSpool(id: string): Promise<void> {
     return this.request<void>(`/spools/${id}`, {
       method: "DELETE",
+    });
+  }
+
+  // Spool K-Profiles
+  async getSpoolKProfiles(spoolId: string): Promise<SpoolKProfile[]> {
+    return this.request<SpoolKProfile[]>(`/spools/${spoolId}/k-profiles`);
+  }
+
+  async saveSpoolKProfiles(spoolId: string, profiles: Omit<SpoolKProfile, 'id' | 'spool_id' | 'created_at'>[]): Promise<{ status: string; count: number }> {
+    return this.request<{ status: string; count: number }>(`/spools/${spoolId}/k-profiles`, {
+      method: "PUT",
+      body: JSON.stringify({ profiles }),
     });
   }
 
@@ -532,6 +578,37 @@ class ApiClient {
 
   async getESP32RecoveryInfo(): Promise<ESP32RecoveryInfo> {
     return this.request<ESP32RecoveryInfo>("/device/recovery-info");
+  }
+
+  // Spool Catalog API
+  async getSpoolCatalog(): Promise<CatalogEntry[]> {
+    return this.request<CatalogEntry[]>("/catalog");
+  }
+
+  async addCatalogEntry(entry: CatalogEntryInput): Promise<CatalogEntry> {
+    return this.request<CatalogEntry>("/catalog", {
+      method: "POST",
+      body: JSON.stringify(entry),
+    });
+  }
+
+  async updateCatalogEntry(id: number, entry: CatalogEntryInput): Promise<CatalogEntry> {
+    return this.request<CatalogEntry>(`/catalog/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(entry),
+    });
+  }
+
+  async deleteCatalogEntry(id: number): Promise<void> {
+    return this.request<void>(`/catalog/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async resetSpoolCatalog(): Promise<void> {
+    return this.request<void>("/catalog/reset", {
+      method: "POST",
+    });
   }
 }
 

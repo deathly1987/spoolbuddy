@@ -128,14 +128,16 @@ export function Inventory() {
   }, [loadSpools, loadPrintersAndCalibrations, subscribe]);
 
   const handleAddSpool = async (input: SpoolInput) => {
-    await api.createSpool(input);
+    const spool = await api.createSpool(input);
     await loadSpools();
+    return spool;
   };
 
   const handleEditSpool = async (input: SpoolInput) => {
-    if (!editSpool) return;
-    await api.updateSpool(editSpool.id, input);
+    if (!editSpool) throw new Error('No spool to edit');
+    const spool = await api.updateSpool(editSpool.id, input);
     await loadSpools();
+    return spool;
   };
 
   const handleDeleteSpool = async (spool: Spool) => {
@@ -191,7 +193,6 @@ export function Inventory() {
           spoolsInPrinters={spoolsInPrinters}
           columnConfig={columnConfig}
           onEditSpool={(spool) => setEditSpool(spool)}
-          onDeleteSpool={(spool) => setDeleteSpool(spool)}
           onOpenColumns={() => setShowColumnModal(true)}
         />
       )}
@@ -210,6 +211,7 @@ export function Inventory() {
         onClose={() => setEditSpool(null)}
         onSave={handleEditSpool}
         editSpool={editSpool}
+        onDelete={(spool) => setDeleteSpool(spool)}
         printersWithCalibrations={printersWithCalibrations}
       />
 

@@ -1,10 +1,9 @@
-import { useState, useEffect, useMemo } from 'preact/hooks'
+import { useState, useEffect, useMemo, useRef } from 'preact/hooks'
 import { Modal } from './Modal'
-import { Spool, SpoolInput, Printer, CalibrationProfile, SlicerPreset, api } from '../../lib/api'
-import { X, ChevronDown, ChevronRight, Cloud, CloudOff } from 'lucide-preact'
+import { Spool, SpoolInput, Printer, CalibrationProfile, SlicerPreset, SpoolKProfile, CatalogEntry, api } from '../../lib/api'
+import { X, ChevronDown, ChevronRight, Cloud, CloudOff, Trash2 } from 'lucide-preact'
 import { getFilamentOptions, COLOR_PRESETS } from './utils'
 import { useToast } from '../../lib/toast'
-import { useWebSocket } from '../../lib/websocket'
 
 // Type for printer with its calibrations
 export interface PrinterWithCalibrations {
@@ -15,8 +14,9 @@ export interface PrinterWithCalibrations {
 interface AddSpoolModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (input: SpoolInput) => Promise<void>
+  onSave: (input: SpoolInput) => Promise<Spool>  // Returns the saved spool
   editSpool?: Spool | null  // If provided, we're editing
+  onDelete?: (spool: Spool) => void  // Called when delete button is clicked
   printersWithCalibrations?: PrinterWithCalibrations[]
 }
 
@@ -29,6 +29,7 @@ interface SpoolFormData {
   label_weight: number
   core_weight: number
   slicer_filament: string
+  location: string
   note: string
 }
 
@@ -41,13 +42,91 @@ const defaultFormData: SpoolFormData = {
   label_weight: 1000,
   core_weight: 250,
   slicer_filament: '',
+  location: '',
   note: '',
 }
 
 const MATERIALS = ['PLA', 'PETG', 'ABS', 'TPU', 'ASA', 'PC', 'PA', 'PVA', 'HIPS', 'PA-CF', 'PETG-CF', 'PLA-CF']
 const WEIGHTS = [250, 500, 750, 1000, 2000, 3000]
-const CORE_WEIGHTS = [200, 220, 245, 250, 280]
-const BRANDS = ['Bambu', 'PolyLite', 'PolyTerra', 'eSUN', 'Overture', 'Fiberon', 'SUNLU', 'Inland', 'Hatchbox', 'Generic']
+const DEFAULT_BRANDS = ['Bambu', 'PolyLite', 'PolyTerra', 'eSUN', 'Overture', 'Fiberon', 'SUNLU', 'Inland', 'Hatchbox', 'Generic']
+
+// Known filament variants/subtypes - only these will be auto-filled
+const KNOWN_VARIANTS = [
+  'Basic', 'Matte', 'Silk', 'Tough', 'HF', 'High Flow', 'Engineering',
+  'Galaxy', 'Glow', 'Marble', 'Metal', 'Rainbow', 'Sparkle', 'Wood',
+  'Translucent', 'Transparent', 'Clear', 'Lite', 'Pro', 'Plus', 'Max',
+  'Super', 'Ultra', 'Flex', 'Soft', 'Hard', 'Strong', 'Impact',
+  'Heat Resistant', 'UV Resistant', 'ESD', 'Conductive', 'Magnetic',
+  'Gradient', 'Dual Color', 'Tri Color', 'Multicolor',
+]
+
+// Parse a slicer preset name to extract brand, material, and variant
+function parsePresetName(name: string): { brand: string; material: string; variant: string } {
+  // Remove @printer suffix (e.g., "@Bambu Lab H2D 0.4 nozzle")
+  let cleanName = name.replace(/@.*$/, '').trim()
+  // Remove (Custom) tag
+  cleanName = cleanName.replace(/\(Custom\)/i, '').trim()
+
+  // Materials list - order matters (longer/more specific first)
+  const materials = [
+    'PLA-CF', 'PETG-CF', 'ABS-GF', 'ASA-CF', 'PA-CF', 'PAHT-CF', 'PA6-CF', 'PA6-GF',
+    'PPA-CF', 'PPA-GF', 'PET-CF', 'PPS-CF', 'PC-CF', 'PC-ABS', 'ABS-GF',
+    'PETG', 'PLA', 'ABS', 'ASA', 'PC', 'PA', 'TPU', 'PVA', 'HIPS', 'BVOH', 'PPS', 'PCTG', 'PEEK', 'PEI'
+  ]
+
+  // Find material in the name
+  let material = ''
+  let materialIdx = -1
+  for (const m of materials) {
+    const idx = cleanName.toUpperCase().indexOf(m.toUpperCase())
+    if (idx !== -1) {
+      material = m
+      materialIdx = idx
+      break
+    }
+  }
+
+  // Brand is everything before the material
+  let brand = ''
+  if (materialIdx > 0) {
+    brand = cleanName.substring(0, materialIdx).trim()
+    // Remove trailing spaces/dashes
+    brand = brand.replace(/[-_\s]+$/, '')
+  }
+
+  // Everything after material is potential variant
+  let afterMaterial = ''
+  if (materialIdx !== -1 && material) {
+    afterMaterial = cleanName.substring(materialIdx + material.length).trim()
+    // Remove leading spaces/dashes
+    afterMaterial = afterMaterial.replace(/^[-_\s]+/, '')
+  }
+
+  // Only extract variant if it matches a known variant
+  let variant = ''
+  for (const v of KNOWN_VARIANTS) {
+    if (afterMaterial.toLowerCase().includes(v.toLowerCase())) {
+      variant = v
+      break
+    }
+  }
+
+  return { brand, material, variant }
+}
+
+// Extract unique brands from cloud presets
+function extractBrandsFromPresets(presets: SlicerPreset[]): string[] {
+  const brandSet = new Set<string>(DEFAULT_BRANDS)
+
+  for (const preset of presets) {
+    const { brand } = parsePresetName(preset.name)
+    if (brand && brand.length > 1) {
+      brandSet.add(brand)
+    }
+  }
+
+  return Array.from(brandSet).sort((a, b) => a.localeCompare(b))
+}
 
 // Quick color swatches - most common colors
 const QUICK_COLORS = [
@@ -65,7 +144,110 @@ const QUICK_COLORS = [
   { name: 'Silver', hex: 'C0C0C0' },
 ]
 
-export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWithCalibrations = [] }: AddSpoolModalProps) {
+// Searchable dropdown for spool weight selection
+function SpoolWeightPicker({ catalog, value, onChange }: {
+  catalog: CatalogEntry[]
+  value: number
+  onChange: (weight: number) => void
+}) {
+  const [search, setSearch] = useState('')
+  const [isOpen, setIsOpen] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Filter catalog based on search
+  const filtered = useMemo(() => {
+    if (!search) return catalog
+    const lower = search.toLowerCase()
+    return catalog.filter(e => e.name.toLowerCase().includes(lower))
+  }, [catalog, search])
+
+  // Get display value for the selected weight
+  const selectedEntry = catalog.find(c => c.weight === value)
+  const displayValue = isOpen ? search : (selectedEntry?.name || '')
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+        setSearch('')
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isOpen])
+
+  return (
+    <div>
+      <label class="label">Empty Spool Weight</label>
+      <div class="flex gap-2 items-center">
+        {/* Searchable dropdown */}
+        <div class="flex-1 min-w-0 relative" ref={dropdownRef}>
+          <input
+            ref={inputRef}
+            type="text"
+            class="input w-full"
+            placeholder="Search brand (e.g., Bambu Lab, eSUN)..."
+            value={displayValue}
+            onFocus={() => {
+              setIsOpen(true)
+              setSearch('')
+            }}
+            onInput={(e) => {
+              setSearch((e.target as HTMLInputElement).value)
+              setIsOpen(true)
+            }}
+          />
+          {isOpen && (
+            <div class="absolute z-50 w-full mt-1 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-lg max-h-64 overflow-y-auto">
+              {filtered.length === 0 ? (
+                <div class="px-3 py-2 text-sm text-[var(--text-muted)]">No matches found</div>
+              ) : (
+                filtered.map(entry => (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    class={`w-full px-3 py-2 text-left text-sm hover:bg-[var(--bg-tertiary)] flex justify-between items-center ${
+                      entry.weight === value ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]' : 'text-[var(--text-primary)]'
+                    }`}
+                    onClick={() => {
+                      onChange(entry.weight)
+                      setIsOpen(false)
+                      setSearch('')
+                    }}
+                  >
+                    <span class="truncate">{entry.name}</span>
+                    <span class="font-mono text-xs text-[var(--text-muted)] ml-2 shrink-0">{entry.weight}g</span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+        {/* Direct weight input */}
+        <div class="flex items-center gap-1 shrink-0">
+          <input
+            type="number"
+            class="input w-16 text-center"
+            value={value}
+            min={0}
+            max={2000}
+            onInput={(e) => {
+              const val = parseInt((e.target as HTMLInputElement).value)
+              if (!isNaN(val) && val >= 0) onChange(val)
+            }}
+          />
+          <span class="text-[var(--text-muted)]">g</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, onDelete, printersWithCalibrations = [] }: AddSpoolModalProps) {
   const [formData, setFormData] = useState<SpoolFormData>(defaultFormData)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -74,19 +256,21 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
   const [expandedPrinters, setExpandedPrinters] = useState<Set<string>>(new Set())
   const [selectedProfiles, setSelectedProfiles] = useState<Set<string>>(new Set()) // "serial:cali_idx:extruder_id"
   const { showToast, updateToast } = useToast()
-  const { printerStates } = useWebSocket()
 
   // Cloud presets state
   const [cloudPresets, setCloudPresets] = useState<SlicerPreset[]>([])
   const [cloudAuthenticated, setCloudAuthenticated] = useState(false)
   const [loadingCloudPresets, setLoadingCloudPresets] = useState(false)
 
+  // Spool catalog state (for empty spool weight lookup)
+  const [spoolCatalog, setSpoolCatalog] = useState<CatalogEntry[]>([])
+
   // Separate state for preset input display (shows name, not code)
   const [presetInputValue, setPresetInputValue] = useState('')
 
   const isEditing = !!editSpool
 
-  // Fetch cloud presets when modal opens
+  // Fetch cloud presets and spool catalog when modal opens
   useEffect(() => {
     if (isOpen) {
       const fetchCloudPresets = async () => {
@@ -107,6 +291,9 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
         }
       }
       fetchCloudPresets()
+
+      // Fetch spool catalog for weight lookup
+      api.getSpoolCatalog().then(setSpoolCatalog).catch(console.error)
     }
   }, [isOpen])
 
@@ -123,19 +310,36 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
           label_weight: editSpool.label_weight || 1000,
           core_weight: editSpool.core_weight || 250,
           slicer_filament: editSpool.slicer_filament || '',
+          location: editSpool.location || '',
           note: editSpool.note || '',
         })
         // presetInputValue will be synced by the effect below
+
+        // Load K-profiles for this spool
+        api.getSpoolKProfiles(editSpool.id).then(profiles => {
+          const profileKeys = new Set<string>()
+          for (const p of profiles) {
+            // Find matching calibration in printersWithCalibrations to get cali_idx
+            const printerCals = printersWithCalibrations.find(pc => pc.printer.serial === p.printer_serial)
+            if (printerCals && p.cali_idx !== null) {
+              // Use consistent key format - null/undefined both become 'null'
+              profileKeys.add(`${p.printer_serial}:${p.cali_idx}:${p.extruder ?? 'null'}`)
+            }
+          }
+          setSelectedProfiles(profileKeys)
+        }).catch(() => {
+          // Ignore errors loading K-profiles
+        })
       } else {
         setFormData(defaultFormData)
         setPresetInputValue('')
+        setSelectedProfiles(new Set())
       }
       setError(null)
       setShowAllColors(false)
       setActiveTab('filament')
       // Expand all printers by default
       setExpandedPrinters(new Set(printersWithCalibrations.map(p => p.printer.serial)))
-      setSelectedProfiles(new Set())
     }
   }, [isOpen, editSpool, printersWithCalibrations])
 
@@ -150,25 +354,6 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
       return
     }
 
-    // Parse selected profiles into a structured format
-    // Key format: "serial:cali_idx:extruder_id" (extruder_id may be undefined)
-    const profilesToApply: { serial: string; caliIdx: number; extruderId: number | undefined; name: string; printerName: string }[] = []
-    selectedProfiles.forEach(key => {
-      const parts = key.split(':')
-      const serial = parts[0]
-      const caliIdx = parseInt(parts[1], 10)
-      const extruderId = parts[2] !== undefined && parts[2] !== 'undefined' ? parseInt(parts[2], 10) : undefined
-      const printerData = printersWithCalibrations.find(p => p.printer.serial === serial)
-      const profile = printerData?.calibrations.find(c => c.cali_idx === caliIdx)
-      profilesToApply.push({
-        serial,
-        caliIdx,
-        extruderId,
-        name: profile?.name || profile?.filament_id || `Profile ${caliIdx}`,
-        printerName: printerData?.printer.name || serial
-      })
-    })
-
     setIsSubmitting(true)
     setError(null)
 
@@ -176,7 +361,7 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
     const toastId = showToast('loading', 'Saving spool...')
 
     try {
-      // Step 1: Save the spool
+      // Save the spool
       const input: SpoolInput = {
         material: formData.material,
         subtype: formData.subtype || null,
@@ -186,86 +371,58 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
         label_weight: formData.label_weight,
         core_weight: formData.core_weight,
         slicer_filament: formData.slicer_filament || null,
+        slicer_filament_name: selectedPresetOption?.displayName || presetInputValue || null,
+        location: formData.location || null,
         note: formData.note || null,
-        ext_has_k: profilesToApply.length > 0,
+        ext_has_k: selectedProfiles.size > 0,
+        // Set data_origin for new spools (preserve existing for edits)
+        data_origin: isEditing ? undefined : 'web',
       }
 
-      await onSave(input)
+      const savedSpool = await onSave(input)
 
-      // Step 2: Apply K-profiles to matching AMS slots
-      const profileResults: { success: boolean; slot: string; error?: string }[] = []
+      // Save K-profiles if any selected
+      if (selectedProfiles.size > 0) {
+        updateToast(toastId, 'loading', 'Saving K-profiles...')
+        const profiles: Omit<SpoolKProfile, 'id' | 'spool_id' | 'created_at'>[] = []
 
-      for (const profile of profilesToApply) {
-        // Get the printer's current state to find slots with matching filament
-        const printerState = printerStates.get(profile.serial)
-        if (!printerState) {
-          profileResults.push({ success: false, slot: `${profile.printerName}`, error: 'Printer state not available' })
-          continue
-        }
+        selectedProfiles.forEach(key => {
+          const parts = key.split(':')
+          const serial = parts[0]
+          const caliIdx = parseInt(parts[1], 10)
+          // 'null' means single-nozzle or unspecified extruder
+          const extruderStr = parts[2]
+          const extruderId = extruderStr === 'null' ? null : parseInt(extruderStr, 10)
 
-        // Find all AMS slots that have matching filament (tray_info_idx)
-        const matchingSlots: { amsId: number; trayId: number; extruder: number | null }[] = []
+          // Find the calibration profile to get k_value and name
+          const printerData = printersWithCalibrations.find(p => p.printer.serial === serial)
+          const calProfile = printerData?.calibrations.find(c =>
+            c.cali_idx === caliIdx && (c.extruder_id ?? null) === extruderId
+          )
 
-        for (const amsUnit of printerState.ams_units) {
-          for (const tray of amsUnit.trays) {
-            // Match by tray_info_idx (filament preset ID)
-            if (tray.tray_info_idx === formData.slicer_filament) {
-              // For multi-nozzle printers, only apply to slots matching the extruder
-              if (profile.extruderId !== undefined) {
-                // Check if this AMS unit is for the correct extruder
-                if (amsUnit.extruder === profile.extruderId) {
-                  matchingSlots.push({ amsId: amsUnit.id, trayId: tray.tray_id, extruder: amsUnit.extruder })
-                }
-              } else {
-                matchingSlots.push({ amsId: amsUnit.id, trayId: tray.tray_id, extruder: amsUnit.extruder })
-              }
-            }
-          }
-        }
-
-        // Also check external spool (vt_tray)
-        if (printerState.vt_tray && printerState.vt_tray.tray_info_idx === formData.slicer_filament) {
-          matchingSlots.push({ amsId: printerState.vt_tray.ams_id, trayId: printerState.vt_tray.tray_id, extruder: null })
-        }
-
-        if (matchingSlots.length === 0) {
-          profileResults.push({ success: false, slot: `${profile.printerName}`, error: 'No matching slots found' })
-          continue
-        }
-
-        // Apply K-profile to each matching slot
-        for (const slot of matchingSlots) {
-          updateToast(toastId, 'loading', `Setting K-profile on ${profile.printerName} AMS${slot.amsId}:${slot.trayId}...`)
-          try {
-            await api.setCalibration(profile.serial, slot.amsId, slot.trayId, {
-              cali_idx: profile.caliIdx,
-              filament_id: formData.slicer_filament,
-              nozzle_diameter: "0.4"
+          if (calProfile) {
+            profiles.push({
+              printer_serial: serial,
+              extruder: extruderId,
+              nozzle_diameter: calProfile.nozzle_diameter,
+              nozzle_type: null,
+              k_value: calProfile.k_value.toString(),
+              name: calProfile.name || calProfile.filament_id,
+              cali_idx: caliIdx,
+              setting_id: null,
             })
-            profileResults.push({ success: true, slot: `${profile.printerName} AMS${slot.amsId}:${slot.trayId}` })
-          } catch (err) {
-            const errorMsg = err instanceof Error ? err.message : 'Failed'
-            profileResults.push({ success: false, slot: `${profile.printerName} AMS${slot.amsId}:${slot.trayId}`, error: errorMsg })
           }
+        })
+
+        if (profiles.length > 0) {
+          await api.saveSpoolKProfiles(savedSpool.id, profiles)
         }
-      }
-
-      // Show final result
-      const successes = profileResults.filter(r => r.success)
-      const failures = profileResults.filter(r => !r.success)
-
-      if (profilesToApply.length === 0) {
-        updateToast(toastId, 'success', 'Spool saved successfully')
-      } else if (failures.length > 0 && successes.length === 0) {
-        updateToast(toastId, 'error', `Spool saved but K-profiles failed: ${failures.map(f => f.error).join(', ')}`)
-      } else if (failures.length > 0) {
-        updateToast(toastId, 'success', `Spool saved. K-profiles set on ${successes.length} slot(s), ${failures.length} failed`)
-      } else if (successes.length > 0) {
-        updateToast(toastId, 'success', `Spool saved with K-profiles on ${successes.length} slot(s)`)
       } else {
-        updateToast(toastId, 'success', 'Spool saved successfully')
+        // Clear K-profiles if none selected
+        await api.saveSpoolKProfiles(savedSpool.id, [])
       }
 
+      updateToast(toastId, 'success', 'Spool saved successfully')
       onClose()
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : 'Failed to save spool'
@@ -290,8 +447,9 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
     })
   }
 
-  const toggleProfileSelected = (serial: string, caliIdx: number, extruderId?: number) => {
-    const key = `${serial}:${caliIdx}:${extruderId}`
+  const toggleProfileSelected = (serial: string, caliIdx: number, extruderId?: number | null) => {
+    // Use consistent key format - null/undefined both become 'null'
+    const key = `${serial}:${caliIdx}:${extruderId ?? 'null'}`
     setSelectedProfiles(prev => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
@@ -377,6 +535,11 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
     return getFilamentOptions().map(o => ({ ...o, displayName: o.name, isCustom: false, allCodes: [o.code] }))
   }, [cloudPresets, configuredPrinterModels])
 
+  // Dynamic brands list - extract from cloud presets
+  const availableBrands = useMemo(() => {
+    return extractBrandsFromPresets(cloudPresets)
+  }, [cloudPresets])
+
   // Find the selected preset option (for display and K-profile matching)
   // Check both primary code and allCodes array for matches
   const selectedPresetOption = useMemo(() => {
@@ -411,46 +574,45 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
   // Color list based on toggle
   const colorList = showAllColors ? COLOR_PRESETS : QUICK_COLORS
 
-  // Check if a calibration matches the selected slicer filament
-  // Uses allCodes from the selected preset to match across printer variants
+  // Check if a calibration matches based on brand, material, and variant
   const isMatchingCalibration = (cal: CalibrationProfile) => {
-    if (!formData.slicer_filament) return false
-    const calFilamentId = cal.filament_id?.toLowerCase() || ''
+    // Need at least material to match
+    if (!formData.material) return false
 
-    // If we have a selected preset option, check against all its codes
-    if (selectedPresetOption) {
-      for (const code of selectedPresetOption.allCodes) {
-        const codeLower = code.toLowerCase()
-        // Exact match
-        if (calFilamentId === codeLower) return true
-        // Base code match (e.g., "GFSG02" matches "GFSG02_03")
-        const baseCode = codeLower.replace(/_\d+$/, '')
-        const calBaseCode = calFilamentId.replace(/_\d+$/, '')
-        if (baseCode === calBaseCode) return true
-        // Partial match (contains)
-        if (calFilamentId.includes(codeLower) || codeLower.includes(calFilamentId)) return true
-        // Material type match - compare first 3-4 chars after 'GF' prefix
-        // e.g., "GFHG02" and "GFG02" both contain "G" for PETG
-        if (codeLower.startsWith('gf') && calFilamentId.startsWith('gf')) {
-          // Extract material chars (everything between GF and digits)
-          const codeMatl = codeLower.replace(/^gf/, '').replace(/\d+.*$/, '')
-          const calMatl = calFilamentId.replace(/^gf/, '').replace(/\d+.*$/, '')
-          // Match if one contains the other (e.g., "hg" contains "g", "g" matches "g")
-          if (codeMatl && calMatl && (codeMatl.includes(calMatl) || calMatl.includes(codeMatl))) {
-            return true
-          }
-        }
-      }
+    // Parse the calibration profile name to extract brand/material/variant
+    // K-profile names are like "High Flow_Devil Design PLA Basic" or "HF Devil Design PLA Basic"
+    const profileName = cal.name || ''
+
+    // Remove flow type prefixes
+    let cleanName = profileName
+      .replace(/^High Flow[_\s]+/i, '')
+      .replace(/^Standard[_\s]+/i, '')
+      .replace(/^HF[_\s]+/i, '')
+      .replace(/^S[_\s]+/i, '')
+      .trim()
+
+    const parsed = parsePresetName(cleanName)
+
+    // Match material (required)
+    const materialMatch = parsed.material.toUpperCase() === formData.material.toUpperCase()
+    if (!materialMatch) return false
+
+    // Match brand if specified in form
+    if (formData.brand) {
+      const brandMatch = parsed.brand.toLowerCase().includes(formData.brand.toLowerCase()) ||
+                         formData.brand.toLowerCase().includes(parsed.brand.toLowerCase())
+      if (!brandMatch) return false
     }
 
-    // Also match directly against the selected slicer_filament value
-    const selectedLower = formData.slicer_filament.toLowerCase()
-    const selectedBase = selectedLower.replace(/_\d+$/, '')
-    const calBase = calFilamentId.replace(/_\d+$/, '')
-    return calFilamentId === selectedLower ||
-           calBase === selectedBase ||
-           calFilamentId.includes(selectedLower) ||
-           selectedLower.includes(calFilamentId)
+    // Match variant/subtype if specified in form
+    if (formData.subtype) {
+      const variantMatch = parsed.variant.toLowerCase().includes(formData.subtype.toLowerCase()) ||
+                           formData.subtype.toLowerCase().includes(parsed.variant.toLowerCase()) ||
+                           cleanName.toLowerCase().includes(formData.subtype.toLowerCase())
+      if (!variantMatch) return false
+    }
+
+    return true
   }
 
   return (
@@ -460,14 +622,31 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
       title={isEditing ? 'Edit Spool' : 'Add New Spool'}
       size="lg"
       footer={
-        <>
-          <button class="btn" onClick={onClose} disabled={isSubmitting}>
-            Cancel
-          </button>
-          <button class="btn btn-primary" onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : isEditing ? 'Save Changes' : 'Add Spool'}
-          </button>
-        </>
+        <div class="flex justify-between w-full">
+          <div>
+            {isEditing && onDelete && editSpool && (
+              <button
+                class="btn btn-danger"
+                onClick={() => {
+                  onDelete(editSpool)
+                  onClose()
+                }}
+                disabled={isSubmitting}
+              >
+                <Trash2 class="w-4 h-4" />
+                Delete
+              </button>
+            )}
+          </div>
+          <div class="flex gap-2">
+            <button class="btn" onClick={onClose} disabled={isSubmitting}>
+              Cancel
+            </button>
+            <button class="btn btn-primary" onClick={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : isEditing ? 'Save Changes' : 'Add Spool'}
+            </button>
+          </div>
+        </div>
       }
     >
       {error && (
@@ -539,35 +718,17 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
 
                   if (option) {
                     updateField('slicer_filament', option.code)
-                    // Auto-fill material/brand from preset
-                    const name = option.name
-                    const brands = ['PolyTerra', 'PolyLite', 'Overture', 'Bambu', 'eSUN', 'Generic']
-                    const materials = ['PLA-CF', 'PETG-CF', 'ABS-GF', 'ASA-CF', 'PA-CF', 'PAHT-CF', 'PA6-CF', 'PA6-GF', 'PPA-CF', 'PPA-GF', 'PET-CF', 'PPS-CF', 'PETG', 'PLA', 'ABS', 'ASA', 'PC', 'PA', 'TPU', 'PVA', 'HIPS', 'BVOH', 'PPS', 'PCTG']
-
-                    let brand = ''
-                    let material = ''
-                    let subtype = ''
-                    let remaining = name
-
-                    for (const b of brands) {
-                      if (name.toUpperCase().includes(b.toUpperCase())) {
-                        brand = b
-                        remaining = name.replace(new RegExp(b, 'i'), '').trim()
-                        break
-                      }
+                    // Auto-fill material/brand/variant from preset using parser
+                    const parsed = parsePresetName(option.name)
+                    if (parsed.brand) updateField('brand', parsed.brand)
+                    if (parsed.material) updateField('material', parsed.material)
+                    // Only set variant if a known one was detected (otherwise leave empty)
+                    if (parsed.variant) {
+                      updateField('subtype', parsed.variant)
+                    } else {
+                      // Clear subtype if no known variant found
+                      updateField('subtype', '')
                     }
-                    for (const m of materials) {
-                      if (remaining.toUpperCase().includes(m.toUpperCase())) {
-                        material = m
-                        remaining = remaining.replace(new RegExp(m, 'i'), '').trim()
-                        break
-                      }
-                    }
-                    subtype = remaining.replace(/^\s*[-_]\s*/, '').replace(/\s*[-_]\s*$/, '').trim()
-
-                    if (brand) updateField('brand', brand)
-                    if (material) updateField('material', material)
-                    if (subtype && subtype !== '(Custom)') updateField('subtype', subtype)
                   } else {
                     // User is typing - store the raw input as the code for now
                     updateField('slicer_filament', inputValue)
@@ -628,7 +789,7 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
                   onChange={(e) => updateField('brand', (e.target as HTMLSelectElement).value)}
                 >
                   <option value="">Select...</option>
-                  {BRANDS.map(brand => (
+                  {availableBrands.map(brand => (
                     <option key={brand} value={brand}>{brand}</option>
                   ))}
                 </select>
@@ -748,20 +909,24 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
           <div class="space-y-3">
             <h3 class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Additional</h3>
 
-            {/* Core Weight */}
+            {/* Location */}
             <div>
-              <label class="label">Empty Spool Weight</label>
-              <select
-                class="select"
-                value={formData.core_weight}
-                onChange={(e) => updateField('core_weight', parseInt((e.target as HTMLSelectElement).value))}
-              >
-                {CORE_WEIGHTS.map(w => (
-                  <option key={w} value={w}>{w}g</option>
-                ))}
-              </select>
-              <p class="text-xs text-[var(--text-muted)] mt-1">Weight of the empty spool (without filament)</p>
+              <label class="label">Storage Location</label>
+              <input
+                type="text"
+                class="input"
+                placeholder="e.g., Shelf A, Drawer 1"
+                value={formData.location}
+                onInput={(e) => updateField('location', (e.target as HTMLInputElement).value)}
+              />
             </div>
+
+            {/* Empty Spool Weight - searchable from catalog */}
+            <SpoolWeightPicker
+              catalog={spoolCatalog}
+              value={formData.core_weight}
+              onChange={(weight) => updateField('core_weight', weight)}
+            />
 
             {/* Note */}
             <div>
@@ -778,9 +943,9 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
       ) : (
         /* PA Profile Tab */
         <div class="space-y-4">
-          {!formData.slicer_filament ? (
+          {!formData.material ? (
             <div class="p-4 bg-[var(--bg-tertiary)] rounded-lg text-center text-[var(--text-secondary)]">
-              <p>Please select a slicer preset first in the Filament Info tab.</p>
+              <p>Please select a material first in the Filament Info tab.</p>
             </div>
           ) : printersWithCalibrations.length === 0 ? (
             <div class="p-4 bg-[var(--bg-tertiary)] rounded-lg text-center text-[var(--text-secondary)]">
@@ -788,17 +953,21 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
             </div>
           ) : (
             <div class="space-y-3">
+              {/* Show hint about matching criteria */}
+              <p class="text-xs text-[var(--text-muted)]">
+                Showing K-profiles matching: {formData.brand || 'Any brand'} / {formData.material} / {formData.subtype || 'Any variant'}
+              </p>
+
               {printersWithCalibrations.map(({ printer, calibrations }) => {
                 const isExpanded = expandedPrinters.has(printer.serial)
-                // Only show matching calibrations
+                // Filter to only matching calibrations
                 const matchingCals = calibrations.filter(cal => isMatchingCalibration(cal))
-                const hasMatchingCals = matchingCals.length > 0
+                const matchingCount = matchingCals.length
 
-                // Check if multi-nozzle printer (has matching profiles with different extruder_ids)
-                const extruderIds = new Set(matchingCals.map(cal => cal.extruder_id ?? 0))
-                const isMultiNozzle = extruderIds.size > 1 || (extruderIds.size === 1 && matchingCals.some(cal => cal.extruder_id !== undefined && cal.extruder_id !== null))
+                // Check if multi-nozzle printer (from matching profiles)
+                const isMultiNozzle = matchingCals.some(cal => cal.extruder_id !== undefined && cal.extruder_id !== null && cal.extruder_id > 0)
 
-                // Group matching profiles by extruder for multi-nozzle printers
+                // Group matching profiles by extruder for display
                 const leftNozzleCals = matchingCals.filter(cal => cal.extruder_id === 1)
                 const rightNozzleCals = matchingCals.filter(cal => cal.extruder_id === 0 || cal.extruder_id === undefined || cal.extruder_id === null)
 
@@ -808,7 +977,7 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
                   return (
                     <label
                       key={`${cal.cali_idx}-${cal.extruder_id}`}
-                      class="flex items-center gap-3 p-2 rounded cursor-pointer bg-[var(--accent-color)]/10 hover:bg-[var(--accent-color)]/20"
+                      class="flex items-center gap-3 p-2 rounded cursor-pointer transition-colors bg-[var(--accent-color)]/10 hover:bg-[var(--accent-color)]/20"
                     >
                       <input
                         type="checkbox"
@@ -843,9 +1012,13 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
                         <span class="font-medium text-[var(--text-primary)]">
                           {printer.name || printer.serial}
                         </span>
-                        {hasMatchingCals && (
+                        {matchingCount > 0 ? (
                           <span class="text-xs px-2 py-0.5 rounded bg-[var(--accent-color)]/20 text-[var(--accent-color)]">
-                            {matchingCals.length} profile{matchingCals.length > 1 ? 's' : ''}
+                            {matchingCount} profile{matchingCount !== 1 ? 's' : ''}
+                          </span>
+                        ) : (
+                          <span class="text-xs px-2 py-0.5 rounded bg-[var(--bg-secondary)] text-[var(--text-muted)]">
+                            No matches
                           </span>
                         )}
                       </div>
@@ -865,22 +1038,10 @@ export function AddSpoolModal({ isOpen, onClose, onSave, editSpool, printersWith
                           <p class="text-sm text-[var(--text-muted)] italic">
                             Printer is offline. Connect to view calibration profiles.
                           </p>
-                        ) : calibrations.length === 0 ? (
+                        ) : matchingCount === 0 ? (
                           <p class="text-sm text-[var(--text-muted)] italic">
-                            No calibration profiles found on this printer.
+                            No K-profiles match {formData.brand ? `${formData.brand} ` : ''}{formData.material}{formData.subtype ? ` ${formData.subtype}` : ''}
                           </p>
-                        ) : !hasMatchingCals ? (
-                          <div class="text-sm text-[var(--text-muted)] italic space-y-1">
-                            <p>No matching K-profiles for "{presetInputValue || formData.slicer_filament}"</p>
-                            <p class="text-xs">
-                              Looking for: {formData.slicer_filament}
-                              {selectedPresetOption?.allCodes && selectedPresetOption.allCodes.length > 1 &&
-                                ` (also: ${selectedPresetOption.allCodes.slice(1).join(', ')})`}
-                            </p>
-                            <p class="text-xs">
-                              {calibrations.length} profile{calibrations.length !== 1 ? 's' : ''} on printer: {[...new Set(calibrations.map(c => c.filament_id))].join(', ')}
-                            </p>
-                          </div>
                         ) : isMultiNozzle ? (
                           /* Multi-nozzle: group by extruder */
                           <>

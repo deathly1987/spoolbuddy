@@ -4,6 +4,7 @@ import { api, CloudAuthStatus, VersionInfo, UpdateCheck, UpdateStatus, ESP32Conn
 import { Cloud, CloudOff, LogOut, Loader2, Mail, Lock, Key, Download, RefreshCw, CheckCircle, AlertCircle, GitBranch, ExternalLink, Wifi, WifiOff, Cpu, Search, Usb, RotateCcw } from "lucide-preact";
 import { useToast } from "../lib/toast";
 import { SerialTerminal } from "../components/SerialTerminal";
+import { SpoolCatalogSettings } from "../components/SpoolCatalogSettings";
 
 export function Settings() {
   const { deviceConnected, currentWeight } = useWebSocket();
@@ -291,6 +292,11 @@ export function Settings() {
         <h1 class="text-3xl font-bold text-[var(--text-primary)]">Settings</h1>
         <p class="text-[var(--text-secondary)]">Configure SpoolBuddy</p>
       </div>
+
+      {/* Two-column layout */}
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Column */}
+        <div class="space-y-6">
 
       {/* Bambu Cloud settings */}
       <div class="card">
@@ -829,6 +835,18 @@ export function Settings() {
           </div>
         </div>
       </div>
+
+        </div>
+        {/* End Left Column */}
+
+        {/* Right Column */}
+        <div class="space-y-6">
+          {/* Spool Catalog */}
+          <SpoolCatalogSettings />
+        </div>
+        {/* End Right Column */}
+      </div>
+      {/* End Two-column layout */}
     </div>
   );
 }
