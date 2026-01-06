@@ -65,14 +65,11 @@ jobs:
 
       - name: Build firmware
         working-directory: firmware
-        run: |
-          source ~/export-esp.sh
-          cargo build --release
+        run: cargo build --release
 
       - name: Create firmware binary
         working-directory: firmware
         run: |
-          source ~/export-esp.sh
           mkdir -p releases
           espflash save-image --chip esp32s3 \
             target/xtensa-esp32s3-espidf/release/spoolbuddy-firmware \
