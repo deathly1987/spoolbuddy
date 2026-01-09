@@ -96,20 +96,25 @@ export function Printers() {
 
     // Subscribe to WebSocket messages for real-time updates
     const unsubscribe = subscribe((message) => {
+      // Printer config changes - need to reload full list
       if (
-        message.type === "printer_connected" ||
-        message.type === "printer_disconnected" ||
         message.type === "printer_added" ||
         message.type === "printer_updated" ||
         message.type === "printer_removed"
       ) {
         loadPrinters();
-        setConnecting(null);
+      }
 
+      // Connection status changes - handled by printerStatuses, no reload needed
+      // This avoids flickering caused by API race conditions
+      if (message.type === "printer_connected") {
+        setConnecting(null);
         // Fetch calibrations when printer connects
-        if (message.type === "printer_connected" && message.serial) {
+        if (message.serial) {
           fetchCalibrations(message.serial as string);
         }
+      } else if (message.type === "printer_disconnected") {
+        setConnecting(null);
       }
     });
 

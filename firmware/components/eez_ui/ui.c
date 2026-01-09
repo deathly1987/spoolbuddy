@@ -17,9 +17,14 @@
 #include "vars.h"
 #include <stdio.h>
 #include <string.h>
-#include "esp_log.h"
 
+#ifdef ESP_PLATFORM
+#include "esp_log.h"
 static const char *TAG = "ui";
+#define UI_LOGI(fmt, ...) ESP_LOGI(TAG, fmt, ##__VA_ARGS__)
+#else
+#define UI_LOGI(fmt, ...) printf("[ui] " fmt "\n", ##__VA_ARGS__)
+#endif
 
 // =============================================================================
 // IMPORTANT: STALE POINTER WARNING
@@ -73,7 +78,7 @@ void ui_tick() {
 
 int16_t currentScreen = -1;
 enum ScreensEnum pendingScreen = 0;
-enum ScreensEnum previousScreen = SCREEN_ID_MAIN;
+enum ScreensEnum previousScreen = SCREEN_ID_MAIN_SCREEN;
 const char *pending_settings_detail_title = NULL;
 int pending_settings_tab = -1;  // -1 = no change, 0-3 = select tab
 
@@ -96,22 +101,15 @@ void loadScreen(enum ScreensEnum screenId) {
 
     // Map screen IDs to screen objects
     switch (screenId) {
-        case SCREEN_ID_MAIN: screen = objects.main; break;
+        case SCREEN_ID_MAIN_SCREEN: screen = objects.main_screen; break;
         case SCREEN_ID_AMS_OVERVIEW: screen = objects.ams_overview; break;
         case SCREEN_ID_SCAN_RESULT: screen = objects.scan_result; break;
         case SCREEN_ID_SPOOL_DETAILS: screen = objects.spool_details; break;
-        case SCREEN_ID_SETTINGS: screen = objects.settings; break;
-        case SCREEN_ID_SETTINGS_DETAIL: screen = objects.settings_detail; break;
-        case SCREEN_ID_SETTINGS_WI_FI: screen = objects.settings_wi_fi; break;
-        case SCREEN_ID_SETTINGS_MQTT: screen = objects.settings_mqtt; break;
-        case SCREEN_ID_SETTINGS_PRINTER_ADD: screen = objects.settings_printer_add; break;
-        case SCREEN_ID_SETTINGS_PRINTER_EDIT: screen = objects.settings_printer_edit; break;
-        case SCREEN_ID_SETTINGS_NFC: screen = objects.settings_nfc; break;
-        case SCREEN_ID_SETTINGS_SCALE: screen = objects.settings_scale; break;
-        case SCREEN_ID_SETTINGS_DISPLAY: screen = objects.settings_display; break;
-        case SCREEN_ID_SETTINGS_ABOUT: screen = objects.settings_about; break;
-        case SCREEN_ID_SETTINGS_UPDATE: screen = objects.settings_update; break;
-        case SCREEN_ID_SETTINGS_RESET: screen = objects.settings_reset; break;
+        case SCREEN_ID_SETTINGS_SCREEN: screen = objects.settings_screen; break;
+        case SCREEN_ID_SETTINGS_WIFI_SCREEN: screen = objects.settings_wifi_screen; break;
+        case SCREEN_ID_SETTINGS_PRINTER_ADD_SCREEN: screen = objects.settings_printer_add_screen; break;
+        case SCREEN_ID_SETTINGS_DISPLAY_SCREEN: screen = objects.settings_display_screen; break;
+        case SCREEN_ID_SETTINGS_UPDATE_SCREEN: screen = objects.settings_update_screen; break;
         default: screen = getLvglObjectFromIndex(currentScreen); break;
     }
 
@@ -131,7 +129,7 @@ static void ams_setup_click_handler(lv_event_t *e) {
 }
 
 static void home_click_handler(lv_event_t *e) {
-    pendingScreen = SCREEN_ID_MAIN;
+    pendingScreen = SCREEN_ID_MAIN_SCREEN;
 }
 
 static void encode_tag_click_handler(lv_event_t *e) {
@@ -143,7 +141,7 @@ static void catalog_click_handler(lv_event_t *e) {
 }
 
 static void settings_click_handler(lv_event_t *e) {
-    pendingScreen = SCREEN_ID_SETTINGS;
+    pendingScreen = SCREEN_ID_SETTINGS_SCREEN;
 }
 
 // Exported for use by ui_settings.c
@@ -159,27 +157,18 @@ void navigate_to_settings_detail(const char *title) {
     pending_settings_detail_title = title;
 
     // Route to specific settings screens based on title
-    if (strcmp(title, "WiFi Network") == 0) {
-        pendingScreen = SCREEN_ID_SETTINGS_WI_FI;
-    } else if (strcmp(title, "MQTT Broker") == 0) {
-        pendingScreen = SCREEN_ID_SETTINGS_MQTT;
-    } else if (strcmp(title, "Add Printer") == 0) {
-        pendingScreen = SCREEN_ID_SETTINGS_PRINTER_ADD;
-    } else if (strcmp(title, "NFC Reader") == 0) {
-        pendingScreen = SCREEN_ID_SETTINGS_NFC;
-    } else if (strcmp(title, "Scale") == 0 || strcmp(title, "Calibrate Scale") == 0) {
-        pendingScreen = SCREEN_ID_SETTINGS_SCALE;
+    // Note: New EEZ design has fewer screens - some are consolidated
+    if (strcmp(title, "WiFi Network") == 0 || strcmp(title, "WiFi") == 0) {
+        pendingScreen = SCREEN_ID_SETTINGS_WIFI_SCREEN;
+    } else if (strcmp(title, "Add Printer") == 0 || strcmp(title, "Printers") == 0) {
+        pendingScreen = SCREEN_ID_SETTINGS_PRINTER_ADD_SCREEN;
     } else if (strcmp(title, "Display") == 0) {
-        pendingScreen = SCREEN_ID_SETTINGS_DISPLAY;
-    } else if (strcmp(title, "About") == 0 || strcmp(title, "Firmware Version") == 0) {
-        pendingScreen = SCREEN_ID_SETTINGS_ABOUT;
-    } else if (strcmp(title, "Check for Updates") == 0) {
-        pendingScreen = SCREEN_ID_SETTINGS_UPDATE;
-    } else if (strcmp(title, "Factory Reset") == 0) {
-        pendingScreen = SCREEN_ID_SETTINGS_RESET;
+        pendingScreen = SCREEN_ID_SETTINGS_DISPLAY_SCREEN;
+    } else if (strcmp(title, "Firmware Update") == 0 || strcmp(title, "Check for Updates") == 0) {
+        pendingScreen = SCREEN_ID_SETTINGS_UPDATE_SCREEN;
     } else {
-        // Fallback to generic detail screen
-        pendingScreen = SCREEN_ID_SETTINGS_DETAIL;
+        // Fallback to main settings screen for unsupported detail pages
+        pendingScreen = SCREEN_ID_SETTINGS_SCREEN;
     }
 }
 
@@ -188,34 +177,57 @@ void navigate_to_settings_detail(const char *title) {
 // =============================================================================
 
 void wire_main_buttons(void) {
-    lv_obj_add_event_cb(objects.ams_setup, ams_setup_click_handler, LV_EVENT_CLICKED, NULL);
-    lv_obj_add_event_cb(objects.encode_tag, encode_tag_click_handler, LV_EVENT_CLICKED, NULL);
-    lv_obj_add_event_cb(objects.catalog, catalog_click_handler, LV_EVENT_CLICKED, NULL);
-    lv_obj_add_event_cb(objects.settings_main, settings_click_handler, LV_EVENT_CLICKED, NULL);
+    if (objects.main_screen_button_ams_setup) {
+        lv_obj_add_event_cb(objects.main_screen_button_ams_setup, ams_setup_click_handler, LV_EVENT_CLICKED, NULL);
+    }
+    if (objects.main_screen_button_encode_tag) {
+        lv_obj_add_event_cb(objects.main_screen_button_encode_tag, encode_tag_click_handler, LV_EVENT_CLICKED, NULL);
+    }
+    if (objects.main_screen_button_catalog) {
+        lv_obj_add_event_cb(objects.main_screen_button_catalog, catalog_click_handler, LV_EVENT_CLICKED, NULL);
+    }
+    if (objects.main_screen_button_settings) {
+        lv_obj_add_event_cb(objects.main_screen_button_settings, settings_click_handler, LV_EVENT_CLICKED, NULL);
+    }
+
+    // Wire printer selection dropdown
+    wire_printer_dropdown();
+
+    // Hide static AMS placeholder content immediately
+    init_main_screen_ams();
 }
 
 void wire_ams_overview_buttons(void) {
-    lv_obj_add_event_cb(objects.ams_setup_2, home_click_handler, LV_EVENT_CLICKED, NULL);
-    lv_obj_add_event_cb(objects.encode_tag_2, encode_tag_click_handler, LV_EVENT_CLICKED, NULL);
-    lv_obj_add_event_cb(objects.catalog_2, catalog_click_handler, LV_EVENT_CLICKED, NULL);
-    lv_obj_add_event_cb(objects.settings_2, settings_click_handler, LV_EVENT_CLICKED, NULL);
+    if (objects.ams_screen_button_home) {
+        lv_obj_add_event_cb(objects.ams_screen_button_home, home_click_handler, LV_EVENT_CLICKED, NULL);
+    }
+    if (objects.ams_screen_button_encode_tag) {
+        lv_obj_add_event_cb(objects.ams_screen_button_encode_tag, encode_tag_click_handler, LV_EVENT_CLICKED, NULL);
+    }
+    if (objects.ams_screen_button_catalog) {
+        lv_obj_add_event_cb(objects.ams_screen_button_catalog, catalog_click_handler, LV_EVENT_CLICKED, NULL);
+    }
+    if (objects.ams_screen_button_settings) {
+        lv_obj_add_event_cb(objects.ams_screen_button_settings, settings_click_handler, LV_EVENT_CLICKED, NULL);
+    }
+
+    // Wire printer selection dropdown
+    wire_ams_printer_dropdown();
 }
 
 void wire_scan_result_buttons(void) {
-    // Back button is first child of top_bar_2 - make it clickable
-    lv_obj_t *back_btn = lv_obj_get_child(objects.top_bar_2, 0);
-    if (back_btn) {
-        lv_obj_add_flag(back_btn, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_event_cb(back_btn, back_click_handler, LV_EVENT_CLICKED, NULL);
+    // Back button - make it clickable
+    if (objects.scan_screen_top_bar_icon_back) {
+        lv_obj_add_flag(objects.scan_screen_top_bar_icon_back, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(objects.scan_screen_top_bar_icon_back, back_click_handler, LV_EVENT_CLICKED, NULL);
     }
 }
 
 void wire_spool_details_buttons(void) {
-    // Back button is first child of top_bar_3 - make it clickable
-    lv_obj_t *back_btn = lv_obj_get_child(objects.top_bar_3, 0);
-    if (back_btn) {
-        lv_obj_add_flag(back_btn, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_event_cb(back_btn, back_click_handler, LV_EVENT_CLICKED, NULL);
+    // Back button - make it clickable
+    if (objects.spool_screen_top_bar_icon_back) {
+        lv_obj_add_flag(objects.spool_screen_top_bar_icon_back, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(objects.spool_screen_top_bar_icon_back, back_click_handler, LV_EVENT_CLICKED, NULL);
     }
 }
 
@@ -227,24 +239,19 @@ void delete_all_screens(void) {
     // Clear module state via cleanup functions
     ui_wifi_cleanup();
     ui_printer_cleanup();
+    reset_notification_state();  // Clear notification dots before deleting screens
+    reset_backend_ui_state();    // Clear all dynamic UI state (AMS widgets, labels, etc.)
 
     lv_obj_t **screens[] = {
-        &objects.main,
+        &objects.main_screen,
         &objects.ams_overview,
         &objects.scan_result,
         &objects.spool_details,
-        &objects.settings,
-        &objects.settings_detail,
-        &objects.settings_wi_fi,
-        &objects.settings_mqtt,
-        &objects.settings_printer_add,
-        &objects.settings_printer_edit,
-        &objects.settings_nfc,
-        &objects.settings_scale,
-        &objects.settings_display,
-        &objects.settings_about,
-        &objects.settings_update,
-        &objects.settings_reset,
+        &objects.settings_screen,
+        &objects.settings_wifi_screen,
+        &objects.settings_printer_add_screen,
+        &objects.settings_display_screen,
+        &objects.settings_update_screen,
     };
     for (size_t i = 0; i < sizeof(screens)/sizeof(screens[0]); i++) {
         if (*screens[i]) {
@@ -270,16 +277,16 @@ void ui_init() {
     }
 
     // Create main screen
-    create_screen_main();
+    create_screen_main_screen();
     wire_main_buttons();
-    loadScreen(SCREEN_ID_MAIN);
+    loadScreen(SCREEN_ID_MAIN_SCREEN);
 }
 
 static int tick_count = 0;
 void ui_tick() {
     tick_count++;
     if (tick_count % 500 == 0) {
-        ESP_LOGI(TAG, "ui_tick #%d", tick_count);
+        UI_LOGI("ui_tick #%d", tick_count);
     }
     if (pendingScreen != 0) {
         enum ScreensEnum screen = pendingScreen;
@@ -288,9 +295,9 @@ void ui_tick() {
         // Track previous screen for back navigation from settings
         // Only update when entering settings from a non-settings screen
         enum ScreensEnum currentScreenId = (enum ScreensEnum)(currentScreen + 1);
-        if (screen == SCREEN_ID_SETTINGS) {
+        if (screen == SCREEN_ID_SETTINGS_SCREEN) {
             // Only save previous screen if coming from main-level screens
-            if (currentScreenId == SCREEN_ID_MAIN ||
+            if (currentScreenId == SCREEN_ID_MAIN_SCREEN ||
                 currentScreenId == SCREEN_ID_AMS_OVERVIEW ||
                 currentScreenId == SCREEN_ID_SCAN_RESULT ||
                 currentScreenId == SCREEN_ID_SPOOL_DETAILS) {
@@ -302,8 +309,8 @@ void ui_tick() {
         delete_all_screens();
 
         switch (screen) {
-            case SCREEN_ID_MAIN:
-                create_screen_main();
+            case SCREEN_ID_MAIN_SCREEN:
+                create_screen_main_screen();
                 wire_main_buttons();
                 break;
             case SCREEN_ID_AMS_OVERVIEW:
@@ -318,8 +325,8 @@ void ui_tick() {
                 create_screen_spool_details();
                 wire_spool_details_buttons();
                 break;
-            case SCREEN_ID_SETTINGS:
-                create_screen_settings();
+            case SCREEN_ID_SETTINGS_SCREEN:
+                create_screen_settings_screen();
                 wire_settings_buttons();
                 wire_printers_tab();
                 update_wifi_ui_state();
@@ -328,59 +335,32 @@ void ui_tick() {
                     pending_settings_tab = -1;
                 }
                 break;
-            case SCREEN_ID_SETTINGS_DETAIL:
-                create_screen_settings_detail();
-                update_settings_detail_title();
-                wire_settings_detail_buttons();
-                pending_settings_detail_title = NULL;
-                break;
-            case SCREEN_ID_SETTINGS_WI_FI:
-                create_screen_settings_wi_fi();
-                wire_settings_subpage_buttons(objects.settings_wifi_back_btn);
+            case SCREEN_ID_SETTINGS_WIFI_SCREEN:
+                create_screen_settings_wifi_screen();
+                wire_settings_subpage_buttons(objects.settings_wifi_screen_top_bar_icon_back);
                 wire_wifi_settings_buttons();
                 break;
-            case SCREEN_ID_SETTINGS_MQTT:
-                create_screen_settings_mqtt();
-                wire_settings_subpage_buttons(objects.settings_mqtt_back_btn);
-                break;
-            case SCREEN_ID_SETTINGS_PRINTER_ADD:
-                create_screen_settings_printer_add();
-                wire_settings_subpage_buttons(objects.settings_printer_add_back_btn);
+            case SCREEN_ID_SETTINGS_PRINTER_ADD_SCREEN:
+                create_screen_settings_printer_add_screen();
+                wire_settings_subpage_buttons(objects.settings_printer_add_screen_top_bar_icon_back);
                 wire_printer_add_buttons();
                 break;
-            case SCREEN_ID_SETTINGS_PRINTER_EDIT:
-                create_screen_settings_printer_edit();
-                wire_settings_subpage_buttons(objects.settings_printer_add_back_btn_1);
-                wire_printer_edit_buttons();
+            case SCREEN_ID_SETTINGS_DISPLAY_SCREEN:
+                create_screen_settings_display_screen();
+                wire_settings_subpage_buttons(objects.settings_display_screen_top_bar_icon_back);
                 break;
-            case SCREEN_ID_SETTINGS_NFC:
-                create_screen_settings_nfc();
-                wire_settings_subpage_buttons(objects.settings_nfc_back_btn);
-                break;
-            case SCREEN_ID_SETTINGS_SCALE:
-                create_screen_settings_scale();
-                wire_settings_subpage_buttons(objects.settings_scale_back_btn);
-                wire_scale_buttons();
-                break;
-            case SCREEN_ID_SETTINGS_DISPLAY:
-                create_screen_settings_display();
-                wire_settings_subpage_buttons(objects.settings_display_back_btn);
-                break;
-            case SCREEN_ID_SETTINGS_ABOUT:
-                create_screen_settings_about();
-                wire_settings_subpage_buttons(objects.settings_about_back_btn);
-                break;
-            case SCREEN_ID_SETTINGS_UPDATE:
-                create_screen_settings_update();
-                wire_settings_subpage_buttons(objects.settings_update_back_btn);
-                break;
-            case SCREEN_ID_SETTINGS_RESET:
-                create_screen_settings_reset();
-                wire_settings_subpage_buttons(objects.settings_reset_back_btn);
+            case SCREEN_ID_SETTINGS_UPDATE_SCREEN:
+                create_screen_settings_update_screen();
+                wire_settings_subpage_buttons(objects.settings_update_screen_top_bar_icon_back);
+                wire_update_buttons();
                 break;
         }
 
         loadScreen(screen);
+
+        // Force immediate backend UI update for the new screen
+        // This ensures clock, dropdown, etc. are populated immediately
+        update_backend_ui();
     }
 
     // Poll WiFi status (every ~50 ticks = 250ms)
@@ -391,19 +371,17 @@ void ui_tick() {
 
         // Update WiFi settings screen if active
         int screen_id = currentScreen + 1;
-        if (screen_id == SCREEN_ID_SETTINGS || screen_id == SCREEN_ID_SETTINGS_WI_FI) {
+        if (screen_id == SCREEN_ID_SETTINGS_SCREEN || screen_id == SCREEN_ID_SETTINGS_WIFI_SCREEN) {
             update_wifi_ui_state();
         }
 
-        // Update scale screen if active
-        if (screen_id == SCREEN_ID_SETTINGS_SCALE) {
-            update_scale_ui();
-        }
+        // Update firmware update screen if active
+        update_firmware_ui();
 
         // Update backend status UI (main screen printer info)
-        ESP_LOGI(TAG, "Calling update_backend_ui");
+        UI_LOGI("Calling update_backend_ui");
         update_backend_ui();
-        ESP_LOGI(TAG, "update_backend_ui returned");
+        UI_LOGI("update_backend_ui returned");
 
         // Update WiFi icon for CURRENT screen only (other screen objects are freed)
         WifiStatus status;
@@ -412,51 +390,32 @@ void ui_tick() {
         // Get the WiFi icon for the current screen
         lv_obj_t *wifi_icon = NULL;
         switch (screen_id) {
-            case SCREEN_ID_MAIN:
-                wifi_icon = objects.wifi_signal;
+            case SCREEN_ID_MAIN_SCREEN:
+                wifi_icon = objects.top_bar_wifi_signal;
                 break;
             case SCREEN_ID_AMS_OVERVIEW:
+                wifi_icon = objects.ams_screen_top_bar_wifi_signal;
+                break;
             case SCREEN_ID_SCAN_RESULT:
-                wifi_icon = objects.wifi_signal_4;
+                wifi_icon = objects.scan_screen_top_bar_icon_wifi_signal;
                 break;
             case SCREEN_ID_SPOOL_DETAILS:
-                wifi_icon = objects.wifi_signal_2;
+                wifi_icon = objects.spool_screen_top_bar_icon_wifi_signal;
                 break;
-            case SCREEN_ID_SETTINGS_DETAIL:
-                wifi_icon = objects.wifi_signal_3;
+            case SCREEN_ID_SETTINGS_SCREEN:
+                wifi_icon = objects.settings_screen_top_bar_icon_wifi_signal;
                 break;
-            case SCREEN_ID_SETTINGS:
-                wifi_icon = objects.wifi_signal_s;
+            case SCREEN_ID_SETTINGS_WIFI_SCREEN:
+                wifi_icon = objects.settings_wifi_screen_top_bar_icon_wifi_signal;
                 break;
-            case SCREEN_ID_SETTINGS_WI_FI:
-                wifi_icon = objects.wifi_signal_sd_wifi;
+            case SCREEN_ID_SETTINGS_PRINTER_ADD_SCREEN:
+                wifi_icon = objects.settings_printer_add_screen_top_bar_icon_wifi_signal;
                 break;
-            case SCREEN_ID_SETTINGS_MQTT:
-                wifi_icon = objects.wifi_signal_sd_mqtt;
+            case SCREEN_ID_SETTINGS_DISPLAY_SCREEN:
+                wifi_icon = objects.settings_display_screen_top_bar_icon_wifi_signal;
                 break;
-            case SCREEN_ID_SETTINGS_PRINTER_ADD:
-                wifi_icon = objects.wifi_signal_sd_printer_add;
-                break;
-            case SCREEN_ID_SETTINGS_PRINTER_EDIT:
-                wifi_icon = objects.wifi_signal_sd_printer_add_1;
-                break;
-            case SCREEN_ID_SETTINGS_NFC:
-                wifi_icon = objects.wifi_signal_sd_nfc;
-                break;
-            case SCREEN_ID_SETTINGS_SCALE:
-                wifi_icon = objects.wifi_signal_sd_scale;
-                break;
-            case SCREEN_ID_SETTINGS_DISPLAY:
-                wifi_icon = objects.wifi_signal_sd_display;
-                break;
-            case SCREEN_ID_SETTINGS_ABOUT:
-                wifi_icon = objects.wifi_signal_sd_about;
-                break;
-            case SCREEN_ID_SETTINGS_UPDATE:
-                wifi_icon = objects.wifi_signal_sd_update;
-                break;
-            case SCREEN_ID_SETTINGS_RESET:
-                wifi_icon = objects.wifi_signal_sd_reset;
+            case SCREEN_ID_SETTINGS_UPDATE_SCREEN:
+                wifi_icon = objects.settings_update_screen_top_bar_icon_wifi_signal;
                 break;
             default:
                 break;

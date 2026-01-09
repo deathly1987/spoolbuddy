@@ -457,10 +457,11 @@ class PrinterConnection:
 
     def _on_connect(self, client, userdata, flags, reason_code, properties):
         """MQTT connect callback."""
+        logger.info(f"MQTT _on_connect for {self.serial}: reason_code={reason_code}")
         if reason_code == 0:
             self._connected = True
             self._disconnect_time = None  # Clear disconnect timestamp on reconnect
-            logger.info(f"Connected to printer {self.serial}")
+            logger.info(f"Connected to printer {self.serial} - _connected is now True")
 
             # Subscribe to report topic
             topic = f"device/{self.serial}/report"
@@ -517,6 +518,11 @@ class PrinterConnection:
             topic = f"device/{self.serial}/request"
             payload = json.dumps({"pushing": {"command": "pushall", "sequence_id": "1"}})
             self._client.publish(topic, payload)
+            logger.debug(f"[{self.serial}] Sent pushall request")
+
+    def refresh_state(self):
+        """Request full printer state refresh (public method)."""
+        self._send_pushall()
 
     def _fetch_calibrations(self, nozzle_diameter: str = "0.4"):
         """Request calibration profiles for a nozzle diameter."""
@@ -723,6 +729,9 @@ class PrinterConnection:
         if not hasattr(self, "_ams_extruder_map"):
             self._ams_extruder_map = {}
 
+        # Track if we have info field in this update (helps debug)
+        has_info_field = any(unit.get("info") is not None for unit in ams_data["ams"])
+
         for ams_unit in ams_data["ams"]:
             unit_id = self._safe_int(ams_unit.get("id"), 0)
             info = ams_unit.get("info")
@@ -734,8 +743,10 @@ class PrinterConnection:
                     # So we invert: extruder_id = 1 - bit8
                     bit8 = (info_val >> 8) & 0x1
                     extruder_id = 1 - bit8  # 0=right, 1=left
+                    old_extruder = self._ams_extruder_map.get(unit_id)
+                    if old_extruder != extruder_id:
+                        logger.info(f"[{self.serial}] AMS {unit_id} extruder changed: {old_extruder} -> {extruder_id} (info={info_val})")
                     self._ams_extruder_map[unit_id] = extruder_id
-                    logger.debug(f"AMS {unit_id} info={info_val} (bit8={bit8}) -> extruder {extruder_id}")
                 except (ValueError, TypeError):
                     pass
 
@@ -888,10 +899,13 @@ class PrinterManager:
 
     def _handle_disconnect(self, serial: str):
         """Handle printer disconnection."""
-        logger.info(f"Printer {serial} disconnected")
-        # Remove from connections if still there
+        logger.info(f"PrinterManager: Printer {serial} disconnected")
+        # Don't remove from _connections - allow reconnection to work
+        # The PrinterConnection.connected property handles status correctly
+        # and paho-mqtt's loop_start() will attempt automatic reconnection
         if serial in self._connections:
-            self._connections.pop(serial, None)
+            conn = self._connections[serial]
+            logger.info(f"PrinterManager: {serial} status: _connected={conn._connected}, disconnect_time={conn._disconnect_time}")
         # Notify external callback
         if self._on_disconnect:
             self._on_disconnect(serial)
@@ -909,6 +923,20 @@ class PrinterManager:
         for serial in list(self._connections.keys()):
             await self.disconnect(serial)
 
+    def refresh_all(self):
+        """Request full state refresh from all connected printers.
+
+        This sends a pushall command to each printer, which makes them send
+        their complete current state including AMS extruder assignments.
+        """
+        refreshed = 0
+        for serial, conn in self._connections.items():
+            if conn.connected:
+                conn.refresh_state()
+                refreshed += 1
+        if refreshed > 0:
+            logger.info(f"Requested state refresh from {refreshed} printer(s)")
+
     def is_connected(self, serial: str) -> bool:
         """Check if printer is connected."""
         conn = self._connections.get(serial)
@@ -921,7 +949,11 @@ class PrinterManager:
 
     def get_connection_statuses(self) -> dict[str, bool]:
         """Get connection status for all managed printers."""
-        return {serial: conn.connected for serial, conn in self._connections.items()}
+        statuses = {serial: conn.connected for serial, conn in self._connections.items()}
+        # Log detailed status for debugging
+        for serial, conn in self._connections.items():
+            logger.info(f"Connection status for {serial}: _connected={conn._connected}, disconnect_time={conn._disconnect_time}, connected_prop={conn.connected}")
+        return statuses
 
     def set_filament(
         self,

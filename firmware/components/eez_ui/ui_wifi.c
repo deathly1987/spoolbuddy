@@ -6,11 +6,13 @@
 
 #include "ui_internal.h"
 #include "screens.h"
-#include "esp_log.h"
 #include <stdio.h>
 #include <string.h>
 
+#ifdef ESP_PLATFORM
+#include "esp_log.h"
 static const char *TAG = "ui_wifi";
+#endif
 
 // =============================================================================
 // Module State
@@ -31,8 +33,8 @@ static void wifi_hide_keyboard(void) {
     if (wifi_keyboard) {
         lv_obj_add_flag(wifi_keyboard, LV_OBJ_FLAG_HIDDEN);
     }
-    if (objects.settings_wifi) {
-        lv_obj_scroll_to_y(objects.settings_wifi, 0, LV_ANIM_ON);
+    if (objects.settings_wifi_screen) {
+        lv_obj_scroll_to_y(objects.settings_wifi_screen, 0, LV_ANIM_ON);
     }
     wifi_focused_ta = NULL;
 }
@@ -46,9 +48,9 @@ static void wifi_keyboard_event_cb(lv_event_t *e) {
 
 static void ensure_wifi_keyboard(void) {
     if (wifi_keyboard) return;
-    if (!objects.settings_wi_fi) return;
+    if (!objects.settings_wifi_screen) return;
 
-    wifi_keyboard = lv_keyboard_create(objects.settings_wi_fi);
+    wifi_keyboard = lv_keyboard_create(objects.settings_wifi_screen);
     if (!wifi_keyboard) return;
 
     lv_obj_set_size(wifi_keyboard, 800, 220);
@@ -62,12 +64,12 @@ static void ensure_wifi_keyboard(void) {
 // =============================================================================
 
 void update_wifi_connect_btn_state(void) {
-    if (!objects.wifi_connect_btn) return;
+    if (!objects.settings_wifi_screen_content_panel_button_connect_) return;
 
     WifiStatus status;
     wifi_get_status(&status);
 
-    lv_obj_t *label = lv_obj_get_child(objects.wifi_connect_btn, 0);
+    lv_obj_t *label = lv_obj_get_child(objects.settings_wifi_screen_content_panel_button_connect_, 0);
 
     // Configure label to not wrap text
     if (label && lv_obj_check_type(label, &lv_label_class)) {
@@ -82,8 +84,8 @@ void update_wifi_connect_btn_state(void) {
             lv_label_set_text(label, "Disconnect");
             lv_obj_set_style_text_color(label, lv_color_hex(0xffffffff), LV_PART_MAIN);
         }
-        lv_obj_set_style_bg_color(objects.wifi_connect_btn, lv_color_hex(0xffff5555), LV_PART_MAIN);
-        lv_obj_remove_state(objects.wifi_connect_btn, LV_STATE_DISABLED);
+        lv_obj_set_style_bg_color(objects.settings_wifi_screen_content_panel_button_connect_, lv_color_hex(0xffff5555), LV_PART_MAIN);
+        lv_obj_remove_state(objects.settings_wifi_screen_content_panel_button_connect_, LV_STATE_DISABLED);
         return;
     }
 
@@ -93,15 +95,15 @@ void update_wifi_connect_btn_state(void) {
             lv_label_set_text(label, "Connecting...");
             lv_obj_set_style_text_color(label, lv_color_hex(0xff000000), LV_PART_MAIN);
         }
-        lv_obj_set_style_bg_color(objects.wifi_connect_btn, lv_color_hex(0xffffaa00), LV_PART_MAIN);
-        lv_obj_add_state(objects.wifi_connect_btn, LV_STATE_DISABLED);
+        lv_obj_set_style_bg_color(objects.settings_wifi_screen_content_panel_button_connect_, lv_color_hex(0xffffaa00), LV_PART_MAIN);
+        lv_obj_add_state(objects.settings_wifi_screen_content_panel_button_connect_, LV_STATE_DISABLED);
         return;
     }
 
     // Disconnected - check if user has entered an SSID
     const char *ssid = "";
-    if (objects.wifi_ssid_input) {
-        ssid = lv_textarea_get_text(objects.wifi_ssid_input);
+    if (objects.settings_wifi_screen_content_panel_input_ssid) {
+        ssid = lv_textarea_get_text(objects.settings_wifi_screen_content_panel_input_ssid);
     }
 
     bool has_ssid = ssid && strlen(ssid) > 0;
@@ -112,14 +114,14 @@ void update_wifi_connect_btn_state(void) {
 
     if (has_ssid) {
         // SSID entered - enable Connect button
-        lv_obj_set_style_bg_color(objects.wifi_connect_btn, lv_color_hex(0xff00ff00), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(objects.settings_wifi_screen_content_panel_button_connect_, lv_color_hex(0xff00ff00), LV_PART_MAIN);
         if (label) lv_obj_set_style_text_color(label, lv_color_hex(0xff000000), LV_PART_MAIN);
-        lv_obj_remove_state(objects.wifi_connect_btn, LV_STATE_DISABLED);
+        lv_obj_remove_state(objects.settings_wifi_screen_content_panel_button_connect_, LV_STATE_DISABLED);
     } else {
         // No SSID - disable Connect button
-        lv_obj_set_style_bg_color(objects.wifi_connect_btn, lv_color_hex(0xff404040), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(objects.settings_wifi_screen_content_panel_button_connect_, lv_color_hex(0xff404040), LV_PART_MAIN);
         if (label) lv_obj_set_style_text_color(label, lv_color_hex(0xff888888), LV_PART_MAIN);
-        lv_obj_add_state(objects.wifi_connect_btn, LV_STATE_DISABLED);
+        lv_obj_add_state(objects.settings_wifi_screen_content_panel_button_connect_, LV_STATE_DISABLED);
     }
 }
 
@@ -142,9 +144,9 @@ static void wifi_textarea_click_handler(lv_event_t *e) {
         lv_keyboard_set_textarea(wifi_keyboard, ta);
         lv_obj_remove_flag(wifi_keyboard, LV_OBJ_FLAG_HIDDEN);
 
-        if (objects.settings_wifi) {
+        if (objects.settings_wifi_screen) {
             int32_t ta_y = lv_obj_get_y(ta);
-            lv_obj_scroll_to_y(objects.settings_wifi, ta_y - 20, LV_ANIM_ON);
+            lv_obj_scroll_to_y(objects.settings_wifi_screen, ta_y - 20, LV_ANIM_ON);
         }
     }
 }
@@ -159,8 +161,8 @@ static void wifi_connect_click_handler(lv_event_t *e) {
     if (status.state == 3) {
         // Already connected, disconnect
         wifi_disconnect();
-        if (objects.wifi_status) {
-            lv_label_set_text(objects.wifi_status, "Status: Disconnected");
+        if (objects.settings_wifi_screen_content_panel_label_status) {
+            lv_label_set_text(objects.settings_wifi_screen_content_panel_label_status, "Status: Disconnected");
         }
         update_wifi_ui_state();
         return;
@@ -170,25 +172,25 @@ static void wifi_connect_click_handler(lv_event_t *e) {
     const char *ssid = "";
     const char *password = "";
 
-    if (objects.wifi_ssid_input) {
-        ssid = lv_textarea_get_text(objects.wifi_ssid_input);
+    if (objects.settings_wifi_screen_content_panel_input_ssid) {
+        ssid = lv_textarea_get_text(objects.settings_wifi_screen_content_panel_input_ssid);
     }
-    if (objects.wifi_password_input) {
-        password = lv_textarea_get_text(objects.wifi_password_input);
+    if (objects.settings_wifi_screen_content_panel_input_password) {
+        password = lv_textarea_get_text(objects.settings_wifi_screen_content_panel_input_password);
     }
 
     // Validate SSID
     if (ssid == NULL || strlen(ssid) == 0) {
-        if (objects.wifi_status) {
-            lv_label_set_text(objects.wifi_status, "Status: Enter SSID");
+        if (objects.settings_wifi_screen_content_panel_label_status) {
+            lv_label_set_text(objects.settings_wifi_screen_content_panel_label_status, "Status: Enter SSID");
         }
         return;
     }
 
     // Update status to show connecting
-    if (objects.wifi_status) {
-        lv_label_set_text(objects.wifi_status, "Status: Connecting...");
-        lv_obj_invalidate(objects.wifi_status);
+    if (objects.settings_wifi_screen_content_panel_label_status) {
+        lv_label_set_text(objects.settings_wifi_screen_content_panel_label_status, "Status: Connecting...");
+        lv_obj_invalidate(objects.settings_wifi_screen_content_panel_label_status);
         lv_refr_now(NULL);
     }
 
@@ -201,8 +203,8 @@ static void wifi_connect_click_handler(lv_event_t *e) {
 
 static void wifi_scan_list_btn_handler(lv_event_t *e) {
     const char *ssid = (const char *)lv_event_get_user_data(e);
-    if (ssid && objects.wifi_ssid_input) {
-        lv_textarea_set_text(objects.wifi_ssid_input, ssid);
+    if (ssid && objects.settings_wifi_screen_content_panel_input_ssid) {
+        lv_textarea_set_text(objects.settings_wifi_screen_content_panel_input_ssid, ssid);
     }
     // Close the scan list
     if (wifi_scan_list) {
@@ -263,13 +265,13 @@ static void wifi_scan_click_handler(lv_event_t *e) {
     wifi_scan_list = NULL;
 
     // Update status label
-    if (objects.wifi_status) {
+    if (objects.settings_wifi_screen_content_panel_label_status) {
         char buf[64];
         if (count == 0) {
-            lv_label_set_text(objects.wifi_status, "Status: No networks found");
+            lv_label_set_text(objects.settings_wifi_screen_content_panel_label_status, "Status: No networks found");
         } else {
             snprintf(buf, sizeof(buf), "Found %d networks", count);
-            lv_label_set_text(objects.wifi_status, buf);
+            lv_label_set_text(objects.settings_wifi_screen_content_panel_label_status, buf);
         }
     }
 
@@ -369,34 +371,34 @@ void update_wifi_ui_state(void) {
     wifi_get_status(&status);
 
     // Update WiFi settings screen elements (only if WiFi screen is active)
-    if (!objects.settings_wi_fi) {
+    if (!objects.settings_wifi_screen) {
         // Skip WiFi screen updates if not on WiFi screen
         goto update_settings_tab;
     }
 
     // Update status label
-    if (objects.wifi_status) {
+    if (objects.settings_wifi_screen_content_panel_label_status) {
         char buf[64];
         switch (status.state) {
             case 0: // Uninitialized
-                lv_label_set_text(objects.wifi_status, "Status: WiFi not ready");
+                lv_label_set_text(objects.settings_wifi_screen_content_panel_label_status, "Status: WiFi not ready");
                 break;
             case 1: // Disconnected
-                lv_label_set_text(objects.wifi_status, "Status: Disconnected");
+                lv_label_set_text(objects.settings_wifi_screen_content_panel_label_status, "Status: Disconnected");
                 break;
             case 2: // Connecting
-                lv_label_set_text(objects.wifi_status, "Status: Connecting...");
+                lv_label_set_text(objects.settings_wifi_screen_content_panel_label_status, "Status: Connecting...");
                 break;
             case 3: // Connected
                 snprintf(buf, sizeof(buf), "Connected: %d.%d.%d.%d",
                          status.ip[0], status.ip[1], status.ip[2], status.ip[3]);
-                lv_label_set_text(objects.wifi_status, buf);
+                lv_label_set_text(objects.settings_wifi_screen_content_panel_label_status, buf);
                 break;
             case 4: // Error
-                lv_label_set_text(objects.wifi_status, "Status: Connection failed");
+                lv_label_set_text(objects.settings_wifi_screen_content_panel_label_status, "Status: Connection failed");
                 break;
             default:
-                lv_label_set_text(objects.wifi_status, "Status: Unknown");
+                lv_label_set_text(objects.settings_wifi_screen_content_panel_label_status, "Status: Unknown");
                 break;
         }
     }
@@ -405,75 +407,74 @@ void update_wifi_ui_state(void) {
     update_wifi_connect_btn_state();
 
     // Update SSID input with connected SSID if connected
-    if (status.state == 3 && objects.wifi_ssid_input) {
+    if (status.state == 3 && objects.settings_wifi_screen_content_panel_input_ssid) {
         char ssid_buf[64];
         if (wifi_get_ssid(ssid_buf, sizeof(ssid_buf)) > 0) {
-            const char *current = lv_textarea_get_text(objects.wifi_ssid_input);
+            const char *current = lv_textarea_get_text(objects.settings_wifi_screen_content_panel_input_ssid);
             if (current == NULL || strlen(current) == 0) {
-                lv_textarea_set_text(objects.wifi_ssid_input, ssid_buf);
+                lv_textarea_set_text(objects.settings_wifi_screen_content_panel_input_ssid, ssid_buf);
             }
         }
     }
 
     // Update Scan button state - only enabled when disconnected
-    if (objects.wifi_scan_btn) {
-        lv_obj_t *label = lv_obj_get_child(objects.wifi_scan_btn, 0);
+    if (objects.settings_wifi_screen_content_panel_button_scan_) {
+        lv_obj_t *label = lv_obj_get_child(objects.settings_wifi_screen_content_panel_button_scan_, 0);
         if (status.state == 1) {  // Disconnected - enable scan with green button
-            lv_obj_remove_state(objects.wifi_scan_btn, LV_STATE_DISABLED);
-            lv_obj_set_style_bg_color(objects.wifi_scan_btn, lv_color_hex(0xff00ff00), LV_PART_MAIN);
+            lv_obj_remove_state(objects.settings_wifi_screen_content_panel_button_scan_, LV_STATE_DISABLED);
+            lv_obj_set_style_bg_color(objects.settings_wifi_screen_content_panel_button_scan_, lv_color_hex(0xff00ff00), LV_PART_MAIN);
             if (label) lv_obj_set_style_text_color(label, lv_color_hex(0xff000000), LV_PART_MAIN);
         } else {
-            lv_obj_add_state(objects.wifi_scan_btn, LV_STATE_DISABLED);
-            lv_obj_set_style_bg_color(objects.wifi_scan_btn, lv_color_hex(0xff252525), LV_PART_MAIN);
+            lv_obj_add_state(objects.settings_wifi_screen_content_panel_button_scan_, LV_STATE_DISABLED);
+            lv_obj_set_style_bg_color(objects.settings_wifi_screen_content_panel_button_scan_, lv_color_hex(0xff252525), LV_PART_MAIN);
             if (label) lv_obj_set_style_text_color(label, lv_color_hex(0xff666666), LV_PART_MAIN);
         }
     }
 
 update_settings_tab:
-    // Update network tab elements - obj236=SSID label, obj238=WiFi icon, label_wifi_ipaddress=IP
-    // Note: obj230/obj232 are TAB LABELS, not the network row elements!
-    // These objects only exist when settings screen is created, so object existence check is sufficient
+    // Update network tab elements on the main settings screen
+    // These objects only exist when settings screen is created
 
-    // Update SSID label (obj236) - only if settings screen exists
-    if (objects.settings && objects.obj236) {
+    // Update SSID label
+    if (objects.settings_screen && objects.settings_screen_tabs_network_content_wifi_label_ssid) {
         char ssid_buf[64];
         if (status.state == 3 && wifi_get_ssid(ssid_buf, sizeof(ssid_buf)) > 0) {
-            lv_label_set_text(objects.obj236, ssid_buf);
+            lv_label_set_text(objects.settings_screen_tabs_network_content_wifi_label_ssid, ssid_buf);
         } else if (status.state == 2) {
-            lv_label_set_text(objects.obj236, "Connecting...");
+            lv_label_set_text(objects.settings_screen_tabs_network_content_wifi_label_ssid, "Connecting...");
         } else {
-            lv_label_set_text(objects.obj236, "Not connected");
+            lv_label_set_text(objects.settings_screen_tabs_network_content_wifi_label_ssid, "Not connected");
         }
     }
 
-    // Update WiFi icon (obj238 - this is an IMAGE, not a label)
-    if (objects.settings && objects.obj238) {
+    // Update WiFi icon
+    if (objects.settings_screen && objects.settings_screen_tabs_network_content_wifi_icon_wifi) {
         if (status.state == 3) {
             // Connected - green icon, full opacity
-            lv_obj_set_style_image_recolor(objects.obj238, lv_color_hex(0xff00ff00), LV_PART_MAIN);
-            lv_obj_set_style_image_recolor_opa(objects.obj238, 255, LV_PART_MAIN);
-            lv_obj_set_style_opa(objects.obj238, 255, LV_PART_MAIN);
+            lv_obj_set_style_image_recolor(objects.settings_screen_tabs_network_content_wifi_icon_wifi, lv_color_hex(0xff00ff00), LV_PART_MAIN);
+            lv_obj_set_style_image_recolor_opa(objects.settings_screen_tabs_network_content_wifi_icon_wifi, 255, LV_PART_MAIN);
+            lv_obj_set_style_opa(objects.settings_screen_tabs_network_content_wifi_icon_wifi, 255, LV_PART_MAIN);
         } else if (status.state == 2) {
             // Connecting - yellow icon, full opacity
-            lv_obj_set_style_image_recolor(objects.obj238, lv_color_hex(0xffffaa00), LV_PART_MAIN);
-            lv_obj_set_style_image_recolor_opa(objects.obj238, 255, LV_PART_MAIN);
-            lv_obj_set_style_opa(objects.obj238, 255, LV_PART_MAIN);
+            lv_obj_set_style_image_recolor(objects.settings_screen_tabs_network_content_wifi_icon_wifi, lv_color_hex(0xffffaa00), LV_PART_MAIN);
+            lv_obj_set_style_image_recolor_opa(objects.settings_screen_tabs_network_content_wifi_icon_wifi, 255, LV_PART_MAIN);
+            lv_obj_set_style_opa(objects.settings_screen_tabs_network_content_wifi_icon_wifi, 255, LV_PART_MAIN);
         } else {
             // Disconnected - dimmed (30% opacity)
-            lv_obj_set_style_image_recolor_opa(objects.obj238, 0, LV_PART_MAIN);
-            lv_obj_set_style_opa(objects.obj238, 80, LV_PART_MAIN);
+            lv_obj_set_style_image_recolor_opa(objects.settings_screen_tabs_network_content_wifi_icon_wifi, 0, LV_PART_MAIN);
+            lv_obj_set_style_opa(objects.settings_screen_tabs_network_content_wifi_icon_wifi, 80, LV_PART_MAIN);
         }
     }
 
     // Update IP address label
-    if (objects.settings && objects.label_wifi_ipaddress) {
+    if (objects.settings_screen && objects.settings_screen_tabs_network_content_wifi_label_ip_address) {
         if (status.state == 3) {
             char ip_buf[24];
             snprintf(ip_buf, sizeof(ip_buf), "%d.%d.%d.%d",
                      status.ip[0], status.ip[1], status.ip[2], status.ip[3]);
-            lv_label_set_text(objects.label_wifi_ipaddress, ip_buf);
+            lv_label_set_text(objects.settings_screen_tabs_network_content_wifi_label_ip_address, ip_buf);
         } else {
-            lv_label_set_text(objects.label_wifi_ipaddress, "---");
+            lv_label_set_text(objects.settings_screen_tabs_network_content_wifi_label_ip_address, "---");
         }
     }
 }
@@ -493,35 +494,35 @@ void ui_wifi_cleanup(void) {
 // =============================================================================
 
 void wire_wifi_settings_buttons(void) {
-    if (!objects.settings_wi_fi) return;
+    if (!objects.settings_wifi_screen) return;
 
     // Reset module state when screen is created
     wifi_keyboard = NULL;
     wifi_focused_ta = NULL;
 
     // Wire textarea click events to show keyboard
-    if (objects.wifi_ssid_input) {
-        lv_obj_add_flag(objects.wifi_ssid_input, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_event_cb(objects.wifi_ssid_input, wifi_textarea_click_handler, LV_EVENT_CLICKED, NULL);
+    if (objects.settings_wifi_screen_content_panel_input_ssid) {
+        lv_obj_add_flag(objects.settings_wifi_screen_content_panel_input_ssid, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(objects.settings_wifi_screen_content_panel_input_ssid, wifi_textarea_click_handler, LV_EVENT_CLICKED, NULL);
         // Update connect button when SSID changes
-        lv_obj_add_event_cb(objects.wifi_ssid_input, wifi_textarea_value_changed_handler, LV_EVENT_VALUE_CHANGED, NULL);
+        lv_obj_add_event_cb(objects.settings_wifi_screen_content_panel_input_ssid, wifi_textarea_value_changed_handler, LV_EVENT_VALUE_CHANGED, NULL);
     }
-    if (objects.wifi_password_input) {
-        lv_obj_add_flag(objects.wifi_password_input, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_event_cb(objects.wifi_password_input, wifi_textarea_click_handler, LV_EVENT_CLICKED, NULL);
-        lv_textarea_set_password_mode(objects.wifi_password_input, true);
+    if (objects.settings_wifi_screen_content_panel_input_password) {
+        lv_obj_add_flag(objects.settings_wifi_screen_content_panel_input_password, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(objects.settings_wifi_screen_content_panel_input_password, wifi_textarea_click_handler, LV_EVENT_CLICKED, NULL);
+        lv_textarea_set_password_mode(objects.settings_wifi_screen_content_panel_input_password, true);
     }
 
     // Connect button
-    if (objects.wifi_connect_btn) {
-        lv_obj_add_flag(objects.wifi_connect_btn, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_event_cb(objects.wifi_connect_btn, wifi_connect_click_handler, LV_EVENT_CLICKED, NULL);
+    if (objects.settings_wifi_screen_content_panel_button_connect_) {
+        lv_obj_add_flag(objects.settings_wifi_screen_content_panel_button_connect_, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(objects.settings_wifi_screen_content_panel_button_connect_, wifi_connect_click_handler, LV_EVENT_CLICKED, NULL);
     }
 
     // Scan button
-    if (objects.wifi_scan_btn) {
-        lv_obj_add_flag(objects.wifi_scan_btn, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_event_cb(objects.wifi_scan_btn, wifi_scan_click_handler, LV_EVENT_CLICKED, NULL);
+    if (objects.settings_wifi_screen_content_panel_button_scan_) {
+        lv_obj_add_flag(objects.settings_wifi_screen_content_panel_button_scan_, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(objects.settings_wifi_screen_content_panel_button_scan_, wifi_scan_click_handler, LV_EVENT_CLICKED, NULL);
     }
 
     // Update initial state

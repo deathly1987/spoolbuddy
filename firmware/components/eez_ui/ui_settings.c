@@ -15,17 +15,17 @@
 void select_settings_tab(int tab_index) {
     // Tab button objects
     lv_obj_t *tabs[] = {
-        objects.tab_network,
-        objects.tab_printers,
-        objects.tab_hardware,
-        objects.tab_system
+        objects.settings_screen_tabs_network,
+        objects.settings_screen_tabs_printers,
+        objects.settings_screen_tabs_hardware,
+        objects.settings_screen_tabs_system
     };
     // Tab content objects
     lv_obj_t *contents[] = {
-        objects.tab_network_content,
-        objects.tab_printers_content,
-        objects.tab_hardware_content,
-        objects.tab_system_content
+        objects.settings_screen_tabs_network_content,
+        objects.settings_screen_tabs_printers_content,
+        objects.settings_screen_tabs_hardware_content,
+        objects.settings_screen_tabs_system_content
     };
 
     for (int i = 0; i < 4; i++) {
@@ -96,13 +96,11 @@ static void wire_content_rows(lv_obj_t *content) {
 }
 
 // =============================================================================
-// Settings Detail Title
+// Settings Detail Title (no longer used - removed in new EEZ design)
 // =============================================================================
 
 void update_settings_detail_title(void) {
-    if (pending_settings_detail_title && objects.settings_detail_title) {
-        lv_label_set_text(objects.settings_detail_title, pending_settings_detail_title);
-    }
+    // No longer needed - new EEZ design has dedicated screens with static titles
 }
 
 // =============================================================================
@@ -111,7 +109,7 @@ void update_settings_detail_title(void) {
 
 static void settings_detail_back_handler(lv_event_t *e) {
     pending_settings_tab = -1;  // Don't change tab
-    pendingScreen = SCREEN_ID_SETTINGS;
+    pendingScreen = SCREEN_ID_SETTINGS_SCREEN;
 }
 
 // =============================================================================
@@ -119,18 +117,22 @@ static void settings_detail_back_handler(lv_event_t *e) {
 // =============================================================================
 
 void wire_settings_buttons(void) {
-    // Back button
-    if (objects.settings_back_btn) {
-        lv_obj_add_flag(objects.settings_back_btn, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_remove_flag(objects.settings_back_btn, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-        lv_obj_set_style_opa(objects.settings_back_btn, 180, LV_PART_MAIN | LV_STATE_PRESSED);
-        // Back goes to previous screen (main)
+    // Back button - find first child of top bar if it exists
+    if (objects.settings_network_screen_top_bar_icon_back) {
+        lv_obj_add_flag(objects.settings_network_screen_top_bar_icon_back, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_remove_flag(objects.settings_network_screen_top_bar_icon_back, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+        lv_obj_set_style_opa(objects.settings_network_screen_top_bar_icon_back, 180, LV_PART_MAIN | LV_STATE_PRESSED);
         extern void back_click_handler(lv_event_t *e);
-        lv_obj_add_event_cb(objects.settings_back_btn, back_click_handler, LV_EVENT_CLICKED, NULL);
+        lv_obj_add_event_cb(objects.settings_network_screen_top_bar_icon_back, back_click_handler, LV_EVENT_CLICKED, NULL);
     }
 
     // Tab buttons - make clickable and add pressed style for feedback
-    lv_obj_t *tabs[] = {objects.tab_network, objects.tab_printers, objects.tab_hardware, objects.tab_system};
+    lv_obj_t *tabs[] = {
+        objects.settings_screen_tabs_network,
+        objects.settings_screen_tabs_printers,
+        objects.settings_screen_tabs_hardware,
+        objects.settings_screen_tabs_system
+    };
     void (*handlers[])(lv_event_t*) = {tab_network_handler, tab_printers_handler, tab_hardware_handler, tab_system_handler};
     for (int i = 0; i < 4; i++) {
         if (tabs[i]) {
@@ -142,20 +144,17 @@ void wire_settings_buttons(void) {
     }
 
     // Wire menu rows in each tab content
-    wire_content_rows(objects.tab_network_content);
-    wire_content_rows(objects.tab_printers_content);
-    wire_content_rows(objects.tab_hardware_content);
-    wire_content_rows(objects.tab_system_content);
+    wire_content_rows(objects.settings_screen_tabs_network_content);
+    wire_content_rows(objects.settings_screen_tabs_printers_content);
+    wire_content_rows(objects.settings_screen_tabs_hardware_content);
+    wire_content_rows(objects.settings_screen_tabs_system_content);
 
     // Initialize with first tab selected, hide others
     select_settings_tab(0);
 }
 
 void wire_settings_detail_buttons(void) {
-    if (objects.settings_detail_back_btn) {
-        lv_obj_add_flag(objects.settings_detail_back_btn, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_event_cb(objects.settings_detail_back_btn, settings_detail_back_handler, LV_EVENT_CLICKED, NULL);
-    }
+    // No longer used - new EEZ design has dedicated screens
 }
 
 void wire_settings_subpage_buttons(lv_obj_t *back_btn) {

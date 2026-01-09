@@ -45,6 +45,8 @@ DISPLAY_TIMEOUT_SEC = 10  # Consider disconnected after 10s of no requests
 _display_pending_command: Optional[str] = None
 # Device firmware version (reported by device in heartbeat)
 _display_firmware_version: Optional[str] = None
+# Device reports update is available
+_device_update_available: bool = False
 
 
 def _get_local_ip() -> str:
@@ -379,12 +381,25 @@ async def get_server_time():
 
 
 @app.get("/api/display/heartbeat")
-async def display_heartbeat(version: Optional[str] = None):
+async def display_heartbeat(version: Optional[str] = None, update_available: Optional[bool] = None):
     """Heartbeat endpoint for ESP32 display to indicate it's connected."""
-    global _display_firmware_version
+    global _display_firmware_version, _device_update_available
     update_display_heartbeat()
     if version:
         _display_firmware_version = version
+    if update_available is not None:
+        old_status = _device_update_available
+        _device_update_available = update_available
+        # Broadcast if update availability changed
+        if old_status != update_available:
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(broadcast_message({
+                    "type": "device_update_available",
+                    "update_available": update_available,
+                }))
+            except RuntimeError:
+                pass
     cmd = pop_display_command()
     if cmd:
         logger.info(f"Sending command to display: {cmd}")
@@ -404,6 +419,7 @@ async def display_status():
         "connected": is_display_connected(),
         "last_seen": _display_last_seen if _display_last_seen > 0 else None,
         "firmware_version": _display_firmware_version,
+        "update_available": _device_update_available,
     }
 
 
@@ -485,6 +501,7 @@ async def websocket_endpoint(websocket: WebSocket):
             "type": "initial_state",
             "device": {
                 "connected": display_connected,
+                "update_available": _device_update_available,
                 "last_weight": None,
                 "weight_stable": False,
                 "current_tag_id": None,

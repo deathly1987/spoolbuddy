@@ -2,13 +2,13 @@ import { useEffect, useState } from "preact/hooks";
 import { Link } from "wouter-preact";
 import { api, Spool, Printer, CloudAuthStatus } from "../lib/api";
 import { useWebSocket } from "../lib/websocket";
-import { Cloud, CloudOff, X } from "lucide-preact";
+import { Cloud, CloudOff, X, Download } from "lucide-preact";
 
 export function Dashboard() {
   const [spools, setSpools] = useState<Spool[]>([]);
   const [printers, setPrinters] = useState<Printer[]>([]);
   const [loading, setLoading] = useState(true);
-  const { deviceConnected, currentWeight, weightStable, currentTagId, printerStatuses, subscribe } = useWebSocket();
+  const { deviceConnected, deviceUpdateAvailable, currentWeight, weightStable, currentTagId, printerStatuses, subscribe } = useWebSocket();
   const [currentSpool, setCurrentSpool] = useState<Spool | null>(null);
   const [cloudStatus, setCloudStatus] = useState<CloudAuthStatus | null>(null);
   const [cloudBannerDismissed, setCloudBannerDismissed] = useState(() => {
@@ -26,12 +26,9 @@ export function Dashboard() {
         setCurrentSpool(message.spool as Spool);
       } else if (message.type === "tag_removed") {
         setCurrentSpool(null);
-      } else if (
-        message.type === "printer_connected" ||
-        message.type === "printer_disconnected"
-      ) {
-        loadPrinters();
       }
+      // Note: printer_connected/disconnected are handled by WebSocket's printerStatuses map
+      // We don't need to call loadPrinters() here - that causes flickering
     });
 
     return unsubscribe;
@@ -258,6 +255,18 @@ export function Dashboard() {
                 {currentTagId || <span class="text-[var(--text-muted)]">No tag</span>}
               </span>
             </div>
+            {deviceUpdateAvailable && (
+              <div class="flex items-center justify-between pt-2 border-t border-[var(--border-color)]">
+                <span class="text-[var(--text-secondary)]">Firmware</span>
+                <Link
+                  href="/settings#updates"
+                  class="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+                >
+                  <Download class="w-4 h-4" />
+                  Update Available
+                </Link>
+              </div>
+            )}
           </div>
         </div>
 

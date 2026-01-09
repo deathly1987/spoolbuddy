@@ -56,6 +56,8 @@ struct ApiAmsUnit {
 struct ApiPrinter {
     serial: String,
     name: Option<String>,
+    ip_address: Option<String>,
+    access_code: Option<String>,
     connected: bool,
     gcode_state: Option<String>,
     print_progress: Option<u8>,
@@ -116,6 +118,8 @@ impl Default for CachedAmsUnit {
 struct CachedPrinter {
     name: [u8; 32],
     serial: [u8; 20],
+    ip_address: [u8; 20],
+    access_code: [u8; 16],
     connected: bool,
     gcode_state: [u8; 16],
     print_progress: u8,
@@ -137,6 +141,8 @@ impl Default for CachedPrinter {
         Self {
             name: [0; 32],
             serial: [0; 20],
+            ip_address: [0; 20],
+            access_code: [0; 16],
             connected: false,
             gcode_state: [0; 16],
             print_progress: 0,
@@ -180,6 +186,8 @@ const EMPTY_AMS_UNIT: CachedAmsUnit = CachedAmsUnit {
 const EMPTY_PRINTER: CachedPrinter = CachedPrinter {
     name: [0; 32],
     serial: [0; 20],
+    ip_address: [0; 20],
+    access_code: [0; 16],
     connected: false,
     gcode_state: [0; 16],
     print_progress: 0,
@@ -294,7 +302,11 @@ fn send_heartbeat(base_url: &str) {
     use esp_idf_sys::esp_restart;
 
     let version = env!("CARGO_PKG_VERSION");
-    let url = format!("{}/api/display/heartbeat?version={}", base_url, version);
+    let update_available = crate::ota_manager::is_update_available();
+    let url = format!(
+        "{}/api/display/heartbeat?version={}&update_available={}",
+        base_url, version, update_available
+    );
 
     let config = HttpConfig {
         timeout: Some(std::time::Duration::from_millis(2000)),
@@ -458,8 +470,13 @@ fn parse_rgba_color(color: &str) -> u32 {
 fn update_printer_cache(manager: &mut BackendManager, printers: &[ApiPrinter]) {
     manager.printer_count = printers.len().min(MAX_PRINTERS);
 
+    info!("Updating printer cache with {} printers", printers.len());
+
     for (i, printer) in printers.iter().take(MAX_PRINTERS).enumerate() {
         let cached = &mut manager.printers[i];
+
+        info!("Printer {}: serial={}, name={:?}, connected={}",
+              i, printer.serial, printer.name, printer.connected);
 
         // Copy name
         cached.name = [0; 32];
@@ -474,6 +491,22 @@ fn update_printer_cache(manager: &mut BackendManager, printers: &[ApiPrinter]) {
         let serial_bytes = printer.serial.as_bytes();
         let serial_len = serial_bytes.len().min(19);
         cached.serial[..serial_len].copy_from_slice(&serial_bytes[..serial_len]);
+
+        // Copy IP address
+        cached.ip_address = [0; 20];
+        if let Some(ref ip) = printer.ip_address {
+            let bytes = ip.as_bytes();
+            let len = bytes.len().min(19);
+            cached.ip_address[..len].copy_from_slice(&bytes[..len]);
+        }
+
+        // Copy access code
+        cached.access_code = [0; 16];
+        if let Some(ref code) = printer.access_code {
+            let bytes = code.as_bytes();
+            let len = bytes.len().min(15);
+            cached.access_code[..len].copy_from_slice(&bytes[..len]);
+        }
 
         // Copy state
         cached.connected = printer.connected;
@@ -529,7 +562,7 @@ fn update_printer_cache(manager: &mut BackendManager, printers: &[ApiPrinter]) {
             cached_ams.extruder = ams.extruder.map(|e| e as i8).unwrap_or(-1);
             cached_ams.tray_count = ams.trays.len().min(4) as u8;
 
-            info!("  AMS[{}] id={} trays={}", j, ams.id, ams.trays.len());
+            info!("  AMS[{}] id={} extruder={:?} trays={}", j, ams.id, ams.extruder, ams.trays.len());
 
             for (k, tray) in ams.trays.iter().take(4).enumerate() {
                 let cached_tray = &mut cached_ams.trays[k];
@@ -669,17 +702,18 @@ pub struct BackendStatus {
 /// Printer info for C interface
 #[repr(C)]
 pub struct PrinterInfo {
-    pub name: [c_char; 32],           // 32 bytes, offset 0
-    pub serial: [c_char; 20],         // 20 bytes, offset 32
-    pub gcode_state: [c_char; 16],    // 16 bytes, offset 52
-    pub subtask_name: [c_char; 64],   // 64 bytes, offset 68
-    pub stg_cur_name: [c_char; 48],   // 48 bytes, offset 132 - detailed stage name
-    pub remaining_time_min: u16,      // 2 bytes, offset 180
-    pub print_progress: u8,           // 1 byte, offset 182
-    pub stg_cur: i8,                  // 1 byte, offset 183 - stage number (-1 = idle)
-    pub connected: bool,              // 1 byte, offset 184
+    pub name: [c_char; 32],           // 32 bytes
+    pub serial: [c_char; 20],         // 20 bytes
+    pub ip_address: [c_char; 20],     // 20 bytes - for settings sync
+    pub access_code: [c_char; 16],    // 16 bytes - for settings sync
+    pub gcode_state: [c_char; 16],    // 16 bytes
+    pub subtask_name: [c_char; 64],   // 64 bytes
+    pub stg_cur_name: [c_char; 48],   // 48 bytes - detailed stage name
+    pub remaining_time_min: u16,      // 2 bytes
+    pub print_progress: u8,           // 1 byte
+    pub stg_cur: i8,                  // 1 byte - stage number (-1 = idle)
+    pub connected: bool,              // 1 byte
     pub _pad: [u8; 3],                // 3 bytes padding for alignment
-    // Total: 188 bytes
 }
 
 /// Get backend connection status
@@ -744,6 +778,16 @@ pub extern "C" fn backend_get_printer(index: c_int, info: *mut PrinterInfo) -> c
         // Copy serial
         for (i, &b) in cached.serial.iter().enumerate() {
             (*info).serial[i] = b as c_char;
+        }
+
+        // Copy IP address
+        for (i, &b) in cached.ip_address.iter().enumerate() {
+            (*info).ip_address[i] = b as c_char;
+        }
+
+        // Copy access code
+        for (i, &b) in cached.access_code.iter().enumerate() {
+            (*info).access_code[i] = b as c_char;
         }
 
         // Copy state
@@ -984,4 +1028,132 @@ pub extern "C" fn backend_get_active_extruder(printer_index: c_int) -> c_int {
         return -1;
     }
     manager.printers[printer_index as usize].active_extruder
+}
+
+/// Check if firmware update is available
+/// Returns 1 if update available, 0 otherwise
+#[no_mangle]
+pub extern "C" fn ota_is_update_available() -> c_int {
+    if crate::ota_manager::is_update_available() {
+        1
+    } else {
+        0
+    }
+}
+
+/// Get current firmware version
+/// Copies version string to buffer, returns length or -1 on error
+#[no_mangle]
+pub extern "C" fn ota_get_current_version(buf: *mut c_char, buf_len: c_int) -> c_int {
+    if buf.is_null() || buf_len <= 0 {
+        return -1;
+    }
+    let version = crate::ota_manager::get_version();
+    let bytes = version.as_bytes();
+    let copy_len = std::cmp::min(bytes.len(), (buf_len - 1) as usize);
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf as *mut u8, copy_len);
+        *buf.add(copy_len) = 0; // Null terminate
+    }
+    copy_len as c_int
+}
+
+/// Get available update version
+/// Copies version string to buffer, returns length or -1 on error
+#[no_mangle]
+pub extern "C" fn ota_get_update_version(buf: *mut c_char, buf_len: c_int) -> c_int {
+    if buf.is_null() || buf_len <= 0 {
+        return -1;
+    }
+    let version = crate::ota_manager::get_update_version();
+    let bytes = version.as_bytes();
+    let copy_len = std::cmp::min(bytes.len(), (buf_len - 1) as usize);
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf as *mut u8, copy_len);
+        *buf.add(copy_len) = 0; // Null terminate
+    }
+    copy_len as c_int
+}
+
+/// Get OTA state
+/// Returns: 0=Idle, 1=Checking, 2=Downloading, 3=Validating, 4=Flashing, 5=Complete, 6=Error
+#[no_mangle]
+pub extern "C" fn ota_get_state() -> c_int {
+    match crate::ota_manager::get_state() {
+        crate::ota_manager::OtaState::Idle => 0,
+        crate::ota_manager::OtaState::Checking => 1,
+        crate::ota_manager::OtaState::Downloading { .. } => 2,
+        crate::ota_manager::OtaState::Validating => 3,
+        crate::ota_manager::OtaState::Flashing { .. } => 4,
+        crate::ota_manager::OtaState::Complete => 5,
+        crate::ota_manager::OtaState::Error(_) => 6,
+    }
+}
+
+/// Get OTA download/flash progress (0-100)
+/// Returns -1 if not in a progress state
+#[no_mangle]
+pub extern "C" fn ota_get_progress() -> c_int {
+    match crate::ota_manager::get_state() {
+        crate::ota_manager::OtaState::Downloading { progress } => progress as c_int,
+        crate::ota_manager::OtaState::Flashing { progress } => progress as c_int,
+        _ => -1,
+    }
+}
+
+/// Trigger OTA update check (non-blocking, spawns thread)
+/// Returns 0 on success, -1 on error
+#[no_mangle]
+pub extern "C" fn ota_check_for_update() -> c_int {
+    // Get backend URL
+    let manager = BACKEND_MANAGER.lock().unwrap();
+    let url = match &manager.state {
+        BackendState::Connected { ip, port } => {
+            format!("http://{}.{}.{}.{}:{}", ip[0], ip[1], ip[2], ip[3], port)
+        }
+        _ => return -1, // Not connected
+    };
+    drop(manager);
+
+    // Spawn thread with larger stack (HTTP client needs more stack space)
+    std::thread::Builder::new()
+        .name("ota_check".into())
+        .stack_size(8192)  // 8KB stack
+        .spawn(move || {
+            match crate::ota_manager::check_for_update(&url) {
+                Ok(info) => {
+                    crate::ota_manager::set_update_available(info.available, &info.version);
+                    info!("OTA check complete: available={}, version={}", info.available, info.version);
+                }
+                Err(e) => {
+                    warn!("OTA check failed: {}", e);
+                }
+            }
+        })
+        .ok();
+    0
+}
+
+/// Trigger OTA update (non-blocking, spawns thread)
+/// Returns 0 on success, -1 on error
+#[no_mangle]
+pub extern "C" fn ota_start_update() -> c_int {
+    // Get backend URL
+    let manager = BACKEND_MANAGER.lock().unwrap();
+    let url = match &manager.state {
+        BackendState::Connected { ip, port } => {
+            format!("http://{}.{}.{}.{}:{}", ip[0], ip[1], ip[2], ip[3], port)
+        }
+        _ => return -1, // Not connected
+    };
+    drop(manager);
+
+    // Spawn thread to perform update
+    std::thread::spawn(move || {
+        if let Err(e) = crate::ota_manager::perform_update(&url) {
+            log::error!("OTA update failed: {}", e);
+        }
+        // Note: perform_update reboots on success, so we only get here on error
+    });
+    0
 }

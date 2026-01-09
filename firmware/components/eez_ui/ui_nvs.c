@@ -2,9 +2,17 @@
 // ui_nvs.c - NVS Persistence Functions
 // =============================================================================
 // Handles saving and loading printer configuration to/from ESP32 NVS flash.
+// On simulator, data is kept in memory only (not persisted).
 // =============================================================================
 
 #include "ui_internal.h"
+#include <stdio.h>
+
+#ifdef ESP_PLATFORM
+// =============================================================================
+// ESP32 Implementation - Real NVS Storage
+// =============================================================================
+
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "esp_log.h"
@@ -15,10 +23,6 @@ static const char *TAG = "ui_nvs";
 #define PRINTERS_NVS_NAMESPACE "printers"
 #define PRINTERS_NVS_KEY_COUNT "count"
 #define PRINTERS_NVS_KEY_DATA "data"
-
-// =============================================================================
-// Save Printers to NVS
-// =============================================================================
 
 void save_printers_to_nvs(void) {
     nvs_handle_t handle;
@@ -55,10 +59,6 @@ void save_printers_to_nvs(void) {
     nvs_close(handle);
 }
 
-// =============================================================================
-// Load Printers from NVS
-// =============================================================================
-
 void load_printers_from_nvs(void) {
     nvs_handle_t handle;
     esp_err_t err = nvs_open(PRINTERS_NVS_NAMESPACE, NVS_READONLY, &handle);
@@ -90,3 +90,20 @@ void load_printers_from_nvs(void) {
 
     nvs_close(handle);
 }
+
+#else
+// =============================================================================
+// Simulator Implementation - In-Memory Only (no persistence)
+// =============================================================================
+
+void save_printers_to_nvs(void) {
+    // Simulator: data kept in memory only
+    printf("[ui_nvs] Simulator: saved_printer_count=%d (in-memory only)\n", saved_printer_count);
+}
+
+void load_printers_from_nvs(void) {
+    // Simulator: nothing to load, printers come from backend
+    printf("[ui_nvs] Simulator: no persistent storage, printers sync from backend\n");
+}
+
+#endif

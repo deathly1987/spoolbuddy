@@ -179,6 +179,24 @@ const uint8_t* backend_get_cover_data(uint32_t *size_out);
 int time_get_hhmm(void);
 int time_is_synced(void);
 
+// =============================================================================
+// Functions implemented in ui.c (simulator's own implementation)
+// =============================================================================
+
+void sync_printers_from_backend(void);
+
+// =============================================================================
+// OTA functions (mocked in simulator - implemented in sim_mocks.c)
+// =============================================================================
+
+int ota_is_update_available(void);
+int ota_get_current_version(char *buf, int buf_len);
+int ota_get_update_version(char *buf, int buf_len);
+int ota_get_state(void);
+int ota_get_progress(void);
+int ota_check_for_update(void);
+int ota_start_update(void);
+
 #ifdef __cplusplus
 }
 #endif

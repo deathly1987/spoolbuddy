@@ -48,6 +48,8 @@ pub struct UpdateInfo {
 // Global state
 static OTA_STATE: Mutex<OtaState> = Mutex::new(OtaState::Idle);
 static CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
+static UPDATE_AVAILABLE: Mutex<bool> = Mutex::new(false);
+static UPDATE_VERSION: Mutex<String> = Mutex::new(String::new());
 
 /// Get current OTA state
 pub fn get_state() -> OtaState {
@@ -62,6 +64,22 @@ fn set_state(state: OtaState) {
 /// Get current firmware version
 pub fn get_version() -> &'static str {
     CURRENT_VERSION
+}
+
+/// Set update availability status
+pub fn set_update_available(available: bool, version: &str) {
+    *UPDATE_AVAILABLE.lock().unwrap() = available;
+    *UPDATE_VERSION.lock().unwrap() = version.to_string();
+}
+
+/// Check if update is available
+pub fn is_update_available() -> bool {
+    *UPDATE_AVAILABLE.lock().unwrap()
+}
+
+/// Get available update version
+pub fn get_update_version() -> String {
+    UPDATE_VERSION.lock().unwrap().clone()
 }
 
 /// Check for available updates

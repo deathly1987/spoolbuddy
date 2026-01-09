@@ -906,13 +906,29 @@ fn main() {
             backend_client::poll_backend();
         }
 
-        // OTA check on startup (once, after WiFi init) - just log, don't auto-update
-        // Updates are triggered via backend command (reboot with update flag)
+        // OTA check on startup (once, after WiFi init) - check but don't auto-install
+        // Updates are triggered via backend command
         if WIFI_INIT_DONE.load(std::sync::atomic::Ordering::Relaxed)
             && !OTA_CHECK_DONE.load(std::sync::atomic::Ordering::Relaxed)
         {
             OTA_CHECK_DONE.store(true, std::sync::atomic::Ordering::Relaxed);
             info!("Firmware version: v{}", ota_manager::get_version());
+
+            // Check for updates and store result (don't auto-install)
+            match ota_manager::check_for_update("http://192.168.255.16:3000") {
+                Ok(info) => {
+                    if info.available {
+                        info!("Firmware update available: v{}", info.version);
+                        ota_manager::set_update_available(true, &info.version);
+                    } else {
+                        info!("Firmware is up to date");
+                        ota_manager::set_update_available(false, "");
+                    }
+                }
+                Err(e) => {
+                    warn!("OTA check failed: {}", e);
+                }
+            }
         }
 
         // Poll NFC every 20 iterations (~100ms at 5ms delay)

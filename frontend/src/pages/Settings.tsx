@@ -36,6 +36,19 @@ export function Settings() {
   const [uploadingFirmware, setUploadingFirmware] = useState(false);
   const [deviceFirmwareVersion, setDeviceFirmwareVersion] = useState<string | null>(null);
 
+  // Scroll to section if hash is present (e.g., #updates)
+  useEffect(() => {
+    if (window.location.hash) {
+      const id = window.location.hash.slice(1);
+      const el = document.getElementById(id);
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    }
+  }, []);
+
   // Fetch cloud status on mount
   useEffect(() => {
     const fetchStatus = async () => {
@@ -578,7 +591,7 @@ export function Settings() {
       </div>
 
       {/* Software Updates */}
-      <div class="card">
+      <div id="updates" class="card scroll-mt-20">
         <div class="px-6 py-4 border-b border-[var(--border-color)]">
           <div class="flex items-center gap-2">
             <Download class="w-5 h-5 text-[var(--text-muted)]" />

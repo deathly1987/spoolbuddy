@@ -71,15 +71,16 @@ add_subdirectory(lvgl)
 file(GLOB UI_SOURCES "ui/*.c")
 
 # Main executable sources
-set(SIMULATOR_SOURCES main.c ${UI_SOURCES})
+set(SIMULATOR_SOURCES main.c sim_mocks.c ${UI_SOURCES})
 if(ENABLE_BACKEND_CLIENT)
     list(APPEND SIMULATOR_SOURCES backend_client.c)
 endif()
 
 add_executable(simulator ${SIMULATOR_SOURCES})
 
-# Include directories
+# Include directories (esp_stubs FIRST to override ESP-IDF headers)
 target_include_directories(simulator PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/esp_stubs
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/ui
     ${CMAKE_CURRENT_SOURCE_DIR}/lvgl

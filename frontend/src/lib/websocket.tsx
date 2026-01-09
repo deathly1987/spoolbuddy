@@ -40,6 +40,7 @@ export interface PrinterState {
 
 interface WebSocketState {
   deviceConnected: boolean;
+  deviceUpdateAvailable: boolean;
   currentWeight: number | null;
   weightStable: boolean;
   currentTagId: string | null;
@@ -61,6 +62,7 @@ const WebSocketContext = createContext<WebSocketContextValue | null>(null);
 export function WebSocketProvider({ children }: { children: ComponentChildren }) {
   // Use useState for reactive state that triggers re-renders
   const [deviceConnected, setDeviceConnected] = useState(false);
+  const [deviceUpdateAvailable, setDeviceUpdateAvailable] = useState(false);
   const [currentWeight, setCurrentWeight] = useState<number | null>(null);
   const [weightStable, setWeightStable] = useState(false);
   const [currentTagId, setCurrentTagId] = useState<string | null>(null);
@@ -81,12 +83,23 @@ export function WebSocketProvider({ children }: { children: ComponentChildren })
             last_weight?: number;
             weight_stable?: boolean;
             current_tag_id?: string;
+            update_available?: boolean;
           };
           setDeviceConnected(device.connected ?? false);
+          setDeviceUpdateAvailable(device.update_available ?? false);
           setCurrentWeight(device.last_weight ?? null);
           setWeightStable(device.weight_stable ?? false);
           setCurrentTagId(device.current_tag_id ?? null);
         }
+        // Parse initial printer statuses
+        if (message.printers && typeof message.printers === "object") {
+          const printers = message.printers as Record<string, boolean>;
+          setPrinterStatuses(new Map(Object.entries(printers)));
+        }
+        break;
+
+      case "device_update_available":
+        setDeviceUpdateAvailable(message.update_available as boolean);
         break;
 
       case "device_connected":
@@ -210,6 +223,7 @@ export function WebSocketProvider({ children }: { children: ComponentChildren })
 
   const value: WebSocketContextValue = {
     deviceConnected,
+    deviceUpdateAvailable,
     currentWeight,
     weightStable,
     currentTagId,

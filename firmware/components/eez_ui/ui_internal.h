@@ -75,17 +75,18 @@ typedef struct {
 
 // Printer info from backend (must match Rust PrinterInfo struct exactly)
 typedef struct {
-    char name[32];              // 32 bytes, offset 0
-    char serial[20];            // 20 bytes, offset 32
-    char gcode_state[16];       // 16 bytes, offset 52
-    char subtask_name[64];      // 64 bytes, offset 68
-    char stg_cur_name[48];      // 48 bytes, offset 132 - detailed stage name
-    uint16_t remaining_time_min; // 2 bytes, offset 180
-    uint8_t print_progress;     // 1 byte, offset 182
-    int8_t stg_cur;             // 1 byte, offset 183 - stage number (-1 = idle)
-    bool connected;             // 1 byte, offset 184
+    char name[32];              // 32 bytes
+    char serial[20];            // 20 bytes
+    char ip_address[20];        // 20 bytes - for settings sync
+    char access_code[16];       // 16 bytes - for settings sync
+    char gcode_state[16];       // 16 bytes
+    char subtask_name[64];      // 64 bytes
+    char stg_cur_name[48];      // 48 bytes - detailed stage name
+    uint16_t remaining_time_min; // 2 bytes
+    uint8_t print_progress;     // 1 byte
+    int8_t stg_cur;             // 1 byte - stage number (-1 = idle)
+    bool connected;             // 1 byte
     uint8_t _pad[3];            // 3 bytes padding
-    // Total: 188 bytes
 } BackendPrinterInfo;
 
 // Backend client functions (implemented in Rust)
@@ -131,6 +132,22 @@ extern int backend_get_active_extruder(int printer_index);  // -1=unknown, 0=rig
 // Returns hour in upper 8 bits, minute in lower 8 bits, or -1 if not synced
 extern int time_get_hhmm(void);
 extern int time_is_synced(void);
+
+// OTA manager functions (implemented in Rust)
+// Returns 1 if update available, 0 otherwise
+extern int ota_is_update_available(void);
+// Get current firmware version (copies to buf, returns length)
+extern int ota_get_current_version(char *buf, int buf_len);
+// Get available update version (copies to buf, returns length)
+extern int ota_get_update_version(char *buf, int buf_len);
+// Get OTA state: 0=Idle, 1=Checking, 2=Downloading, 3=Validating, 4=Flashing, 5=Complete, 6=Error
+extern int ota_get_state(void);
+// Get download/flash progress (0-100), -1 if not in progress state
+extern int ota_get_progress(void);
+// Trigger update check (non-blocking)
+extern int ota_check_for_update(void);
+// Start OTA update (non-blocking)
+extern int ota_start_update(void);
 
 // =============================================================================
 // Shared Global Variables (defined in ui_core.c)
@@ -184,6 +201,7 @@ void wire_printers_tab(void);
 void update_printers_list(void);
 void update_printer_edit_ui(void);
 void ui_printer_cleanup(void);
+void sync_printers_from_backend(void);  // Sync saved_printers with backend data
 
 // =============================================================================
 // Module Functions - ui_settings.c
@@ -207,6 +225,20 @@ void update_scale_ui(void);
 // =============================================================================
 
 void update_backend_ui(void);
+void wire_printer_dropdown(void);
+void wire_ams_printer_dropdown(void);
+void init_main_screen_ams(void);      // Hide static AMS content immediately on screen load
+int get_selected_printer_index(void);
+bool is_selected_printer_dual_nozzle(void);
+void reset_notification_state(void);  // Call before deleting screens
+void reset_backend_ui_state(void);    // Reset all dynamic UI state when screens deleted
+
+// =============================================================================
+// Module Functions - ui_update.c
+// =============================================================================
+
+void wire_update_buttons(void);
+void update_firmware_ui(void);
 
 // =============================================================================
 // Module Functions - ui_core.c (wiring)

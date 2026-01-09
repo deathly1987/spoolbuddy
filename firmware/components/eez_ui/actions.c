@@ -9,7 +9,7 @@ void action_go_to_ams_overview(lv_event_t *e) {
 
 void action_go_to_home(lv_event_t *e) {
     (void)e;
-    loadScreen(SCREEN_ID_MAIN);
+    loadScreen(SCREEN_ID_MAIN_SCREEN);
 }
 
 void action_encode_tag(lv_event_t *e) {

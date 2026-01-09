@@ -34,35 +34,50 @@ done
 if [ "$DO_SYNC" = "yes" ]; then
     echo "=== Syncing from Debian server ==="
     cd ../../
-    # Exclude build folder and EEZ-generated UI files (we'll copy fresh ones)
-    # BUT include ui.c (custom simulator navigation code)
-    rsync -avr --progress --delete \
+    # Use -L to follow symlinks (dereference them during transfer)
+    # This ensures actual file contents are copied, not broken symlinks
+    rsync -avrL --progress --delete \
         --exclude='lvgl-simulator-sdl/build' \
-        --exclude='lvgl-simulator-sdl/ui/screens.*' \
-        --exclude='lvgl-simulator-sdl/ui/images.*' \
-        --exclude='lvgl-simulator-sdl/ui/styles.*' \
-        --exclude='lvgl-simulator-sdl/ui/ui_image_*' \
-        --exclude='lvgl-simulator-sdl/ui/vars.*' \
-        --exclude='lvgl-simulator-sdl/ui/actions.*' \
-        --exclude='lvgl-simulator-sdl/ui/fonts.*' \
+        --exclude='.git' \
+        --exclude='firmware/target' \
+        --exclude='firmware/.embuild' \
+        --exclude='node_modules' \
+        --exclude='__pycache__' \
+        --exclude='*.pyc' \
         root@claude:/opt/claude/projects/SpoolStation .
     cd SpoolStation/lvgl-simulator-sdl
 else
     echo "=== Skipping rsync (--no-sync) ==="
 fi
 
-echo "=== Copying EEZ UI files ==="
-# Copy all .h files from EEZ
-cp -fv ../eez/src/ui/*.h ui/
+echo "=== Setting up UI files ==="
 
-# Copy all .c files EXCEPT ui.c (preserve custom simulator navigation code)
-for f in ../eez/src/ui/*.c; do
-    base=$(basename "$f")
-    if [ "$base" != "ui.c" ]; then
-        cp -f "$f" ui/
-    fi
-done
-echo "Copied $(ls ../eez/src/ui/*.c | wc -l | tr -d ' ') source files"
+# Copy EEZ-generated files from eez/src/ui/
+echo "Copying EEZ-generated files..."
+cp -fv ../eez/src/ui/screens.c ui/
+cp -fv ../eez/src/ui/screens.h ui/
+cp -fv ../eez/src/ui/images.c ui/
+cp -fv ../eez/src/ui/images.h ui/
+cp -fv ../eez/src/ui/styles.c ui/
+cp -fv ../eez/src/ui/styles.h ui/
+cp -fv ../eez/src/ui/structs.h ui/
+cp -fv ../eez/src/ui/fonts.h ui/
+cp -fv ../eez/src/ui/vars.h ui/
+cp -fv ../eez/src/ui/actions.h ui/
+cp -f ../eez/src/ui/ui_image_*.c ui/ 2>/dev/null || true
+echo "  Copied $(ls ui/ui_image_*.c 2>/dev/null | wc -l | tr -d ' ') image files"
+
+# Copy custom firmware UI files (these have #ifdef ESP_PLATFORM guards)
+echo "Copying custom firmware UI files..."
+cp -fv ../firmware/components/eez_ui/ui.c ui/
+cp -fv ../firmware/components/eez_ui/ui_backend.c ui/
+cp -fv ../firmware/components/eez_ui/ui_printer.c ui/
+cp -fv ../firmware/components/eez_ui/ui_wifi.c ui/
+cp -fv ../firmware/components/eez_ui/ui_settings.c ui/
+cp -fv ../firmware/components/eez_ui/ui_nvs.c ui/
+cp -fv ../firmware/components/eez_ui/ui_scale.c ui/
+cp -fv ../firmware/components/eez_ui/ui_update.c ui/
+cp -fv ../firmware/components/eez_ui/ui_internal.h ui/
 
 echo "=== Applying LVGL 9.x fixes ==="
 

@@ -86,6 +86,10 @@ async def list_printers():
 
     # Get connection statuses
     statuses = _printer_manager.get_connection_statuses() if _printer_manager else {}
+    if statuses:
+        logger.info(f"Printer connection statuses: {statuses}")
+    else:
+        logger.info(f"No printer connections active (_printer_manager={_printer_manager is not None})")
 
     result = []
     for printer in printers:
@@ -197,6 +201,7 @@ async def connect_printer(serial: str):
     if not printer.ip_address or not printer.access_code:
         raise HTTPException(status_code=400, detail="Printer missing IP address or access code")
 
+    logger.info(f"Connecting to printer {serial} at {printer.ip_address}")
     try:
         await _printer_manager.connect(
             serial=printer.serial,
@@ -204,6 +209,7 @@ async def connect_printer(serial: str):
             access_code=printer.access_code,
             name=printer.name,
         )
+        logger.info(f"Connection initiated for {serial}, waiting for MQTT callback")
     except Exception as e:
         logger.error(f"Failed to connect to {serial}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
