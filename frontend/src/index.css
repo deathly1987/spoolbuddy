@@ -4,9 +4,17 @@
 @tailwind components;
 @tailwind utilities;
 
-/* CSS Variables for theming - Light mode (default) */
-/* Matched to Bambuddy UI */
+/* ============================================
+   BASE DEFAULTS
+   ============================================ */
+
 :root {
+  /* Default accent color (green) */
+  --accent: #00ae42;
+  --accent-light: #00c64d;
+  --accent-dark: #009438;
+
+  /* Default light mode background (neutral) */
   --bg-primary: #f5f5f5;
   --bg-secondary: #ffffff;
   --bg-tertiary: #e5e5e5;
@@ -20,12 +28,18 @@
   --text-muted: #6b6b6b;
   --text-tertiary: #808080;
   --border-color: #d4d4d4;
-  --accent-color: #00ae42;
-  --accent-hover: #009639;
+
+  /* Legacy compatibility */
+  --accent-color: var(--accent);
+  --accent-hover: var(--accent-light);
+
   --success-color: #22c55e;
   --warning-color: #f59e0b;
   --error-color: #ef4444;
   --info-color: #3b82f6;
+
+  /* Default style (classic) */
+  --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 
   font-family: 'Inter', system-ui, sans-serif;
   line-height: 1.5;
@@ -60,7 +74,7 @@
   --radius-lg: 12px;
 }
 
-/* Dark mode - Matched to Bambuddy */
+/* Dark mode base */
 .dark {
   --bg-primary: #1a1a1a;
   --bg-secondary: #2d2d2d;
@@ -75,12 +89,7 @@
   --text-muted: #808080;
   --text-tertiary: #4a4a4a;
   --border-color: #3d3d3d;
-  --accent-color: #00ae42;
-  --accent-hover: #00c64d;
-  --success-color: #22c55e;
-  --warning-color: #f59e0b;
-  --error-color: #ef4444;
-  --info-color: #3b82f6;
+  --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 
   /* Badge colors - darker variants */
   --badge-printer-bg: #1e3a5f;
@@ -100,6 +109,200 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+}
+
+/* ============================================
+   LAYER 1: BACKGROUND PALETTES
+   ============================================ */
+
+/* Light mode backgrounds */
+.bg-neutral {
+  /* Default - already set in :root */
+}
+
+.bg-warm {
+  --bg-primary: #faf8f5;
+  --bg-secondary: #fffefa;
+  --bg-tertiary: #e8e4dd;
+  --bg-header: #fffefa;
+  --text-primary: #2d2a26;
+  --text-secondary: #5c5750;
+  --text-muted: #7a756c;
+  --text-tertiary: #9a9590;
+  --header-text: #2d2a26;
+  --header-text-muted: #7a756c;
+  --border-color: #d8d4cc;
+}
+
+.bg-cool {
+  --bg-primary: #f0f4f8;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #dce4ec;
+  --bg-header: #ffffff;
+  --text-primary: #1a2530;
+  --text-secondary: #4a5568;
+  --text-muted: #6b7a8a;
+  --text-tertiary: #8a9aaa;
+  --header-text: #1a2530;
+  --header-text-muted: #6b7a8a;
+  --border-color: #c8d4e0;
+}
+
+/* Dark mode backgrounds */
+.dark.bg-neutral {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --bg-tertiary: #3d3d3d;
+  --bg-header: #1a1a1a;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --text-muted: #808080;
+  --text-tertiary: #4a4a4a;
+  --header-text: #ffffff;
+  --header-text-muted: #a0a0a0;
+  --border-color: #3d3d3d;
+}
+
+.dark.bg-warm {
+  --bg-primary: #1c1a18;
+  --bg-secondary: #2e2a26;
+  --bg-tertiary: #3e3a36;
+  --bg-header: #1c1a18;
+  --text-primary: #f5f0ea;
+  --text-secondary: #b0a898;
+  --text-muted: #8a8278;
+  --text-tertiary: #5a5248;
+  --header-text: #f5f0ea;
+  --header-text-muted: #8a8278;
+  --border-color: #3e3a36;
+}
+
+.dark.bg-cool {
+  --bg-primary: #181c20;
+  --bg-secondary: #262c32;
+  --bg-tertiary: #363e46;
+  --bg-header: #181c20;
+  --text-primary: #f0f4f8;
+  --text-secondary: #98a8b8;
+  --text-muted: #788898;
+  --text-tertiary: #4a5a6a;
+  --header-text: #f0f4f8;
+  --header-text-muted: #788898;
+  --border-color: #363e46;
+}
+
+.dark.bg-oled {
+  --bg-primary: #000000;
+  --bg-secondary: #141414;
+  --bg-tertiary: #1f1f1f;
+  --bg-header: #000000;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --text-muted: #707070;
+  --text-tertiary: #404040;
+  --header-text: #ffffff;
+  --header-text-muted: #707070;
+  --border-color: #2a2a2a;
+}
+
+.dark.bg-slate {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --bg-header: #0f172a;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-tertiary: #475569;
+  --header-text: #f1f5f9;
+  --header-text-muted: #64748b;
+  --border-color: #334155;
+}
+
+.dark.bg-forest {
+  --bg-primary: #121a16;
+  --bg-secondary: #1c2a22;
+  --bg-tertiary: #2a3d30;
+  --bg-header: #121a16;
+  --text-primary: #e8f5ec;
+  --text-secondary: #8aa894;
+  --text-muted: #6a8874;
+  --text-tertiary: #4a6854;
+  --header-text: #e8f5ec;
+  --header-text-muted: #6a8874;
+  --border-color: #2a3d30;
+}
+
+/* ============================================
+   LAYER 2: STYLE EFFECTS
+   ============================================ */
+
+/* Classic - default, clean minimal shadows */
+.style-classic {
+  /* Uses default shadows from :root and .dark */
+}
+
+/* Glow - accent-colored glow effects on cards */
+.style-glow {
+  --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 0 25px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.dark.style-glow {
+  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 40px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+/* Vibrant - dramatic deep shadows, more contrast */
+.style-vibrant {
+  --card-shadow: 0 8px 30px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dark.style-vibrant {
+  --card-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================
+   LAYER 3: ACCENT COLORS
+   ============================================ */
+
+.accent-green {
+  --accent: #00ae42;
+  --accent-light: #00c64d;
+  --accent-dark: #009438;
+}
+
+.accent-teal {
+  --accent: #14b8a6;
+  --accent-light: #2dd4bf;
+  --accent-dark: #0d9488;
+}
+
+.accent-blue {
+  --accent: #3b82f6;
+  --accent-light: #60a5fa;
+  --accent-dark: #2563eb;
+}
+
+.accent-orange {
+  --accent: #f97316;
+  --accent-light: #fb923c;
+  --accent-dark: #ea580c;
+}
+
+.accent-purple {
+  --accent: #8b5cf6;
+  --accent-light: #a78bfa;
+  --accent-dark: #7c3aed;
+}
+
+.accent-red {
+  --accent: #ef4444;
+  --accent-light: #f87171;
+  --accent-dark: #dc2626;
+}
+
+/* Card shadows - uses theme-specific shadow */
+.card-shadow {
+  box-shadow: var(--card-shadow);
 }
 
 /* Custom scrollbar for webkit browsers */
@@ -185,7 +388,7 @@
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--card-shadow);
 }
 
 /* Input styles */

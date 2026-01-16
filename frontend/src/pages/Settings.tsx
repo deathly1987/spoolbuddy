@@ -1,14 +1,23 @@
 import { useState, useEffect, useCallback } from "preact/hooks";
 import { useWebSocket } from "../lib/websocket";
 import { api, CloudAuthStatus, VersionInfo, UpdateCheck, UpdateStatus, FirmwareCheck } from "../lib/api";
-import { Cloud, CloudOff, LogOut, Loader2, Mail, Lock, Key, Download, RefreshCw, CheckCircle, AlertCircle, GitBranch, ExternalLink, Wifi, WifiOff, Cpu, Usb, RotateCcw, Upload, HardDrive } from "lucide-preact";
+import { Cloud, CloudOff, LogOut, Loader2, Mail, Lock, Key, Download, RefreshCw, CheckCircle, AlertCircle, GitBranch, ExternalLink, Wifi, WifiOff, Cpu, Usb, RotateCcw, Upload, HardDrive, Palette, Sun, Moon } from "lucide-preact";
 import { useToast } from "../lib/toast";
 import { SerialTerminal } from "../components/SerialTerminal";
 import { SpoolCatalogSettings } from "../components/SpoolCatalogSettings";
+import { useTheme, type ThemeStyle, type DarkBackground, type LightBackground, type ThemeAccent } from "../lib/theme";
 
 export function Settings() {
   const { deviceConnected, currentWeight } = useWebSocket();
   const { showToast } = useToast();
+  const {
+    mode,
+    darkStyle, darkBackground, darkAccent,
+    lightStyle, lightBackground, lightAccent,
+    toggleMode,
+    setDarkStyle, setDarkBackground, setDarkAccent,
+    setLightStyle, setLightBackground, setLightAccent,
+  } = useTheme();
 
   // Cloud auth state
   const [cloudStatus, setCloudStatus] = useState<CloudAuthStatus | null>(null);
@@ -348,6 +357,142 @@ export function Settings() {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column */}
         <div class="space-y-6">
+
+      {/* Appearance Settings */}
+      <div class="card">
+        <div class="px-6 py-4 border-b border-[var(--border-color)]">
+          <div class="flex items-center gap-2">
+            <Palette class="w-5 h-5 text-[var(--text-muted)]" />
+            <h2 class="text-lg font-medium text-[var(--text-primary)]">Appearance</h2>
+          </div>
+        </div>
+        <div class="p-6 space-y-6">
+          {/* Mode Toggle */}
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-[var(--text-primary)]">Theme Mode</p>
+              <p class="text-sm text-[var(--text-secondary)]">Switch between light and dark mode</p>
+            </div>
+            <button
+              onClick={toggleMode}
+              class="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--border-color)] transition-colors"
+            >
+              {mode === "dark" ? (
+                <>
+                  <Moon class="w-4 h-4 text-[var(--accent)]" />
+                  <span class="text-sm text-[var(--text-primary)]">Dark</span>
+                </>
+              ) : (
+                <>
+                  <Sun class="w-4 h-4 text-[var(--accent)]" />
+                  <span class="text-sm text-[var(--text-primary)]">Light</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Dark Mode Settings */}
+          <div class="border-t border-[var(--border-color)] pt-6">
+            <h3 class="text-sm font-medium text-[var(--text-primary)] mb-4 flex items-center gap-2">
+              <Moon class="w-4 h-4" />
+              Dark Mode Settings
+            </h3>
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <label class="block text-xs text-[var(--text-muted)] mb-1">Background</label>
+                <select
+                  value={darkBackground}
+                  onChange={(e) => { setDarkBackground((e.target as HTMLSelectElement).value as DarkBackground); showToast('success', 'Theme updated'); }}
+                  class="w-full px-2 py-1.5 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                >
+                  <option value="neutral">Neutral</option>
+                  <option value="warm">Warm</option>
+                  <option value="cool">Cool</option>
+                  <option value="oled">OLED Black</option>
+                  <option value="slate">Slate</option>
+                  <option value="forest">Forest</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-[var(--text-muted)] mb-1">Accent</label>
+                <select
+                  value={darkAccent}
+                  onChange={(e) => { setDarkAccent((e.target as HTMLSelectElement).value as ThemeAccent); showToast('success', 'Theme updated'); }}
+                  class="w-full px-2 py-1.5 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                >
+                  <option value="green">Green</option>
+                  <option value="teal">Teal</option>
+                  <option value="blue">Blue</option>
+                  <option value="orange">Orange</option>
+                  <option value="purple">Purple</option>
+                  <option value="red">Red</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-[var(--text-muted)] mb-1">Style</label>
+                <select
+                  value={darkStyle}
+                  onChange={(e) => { setDarkStyle((e.target as HTMLSelectElement).value as ThemeStyle); showToast('success', 'Theme updated'); }}
+                  class="w-full px-2 py-1.5 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                >
+                  <option value="classic">Classic</option>
+                  <option value="glow">Glow</option>
+                  <option value="vibrant">Vibrant</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Light Mode Settings */}
+          <div class="border-t border-[var(--border-color)] pt-6">
+            <h3 class="text-sm font-medium text-[var(--text-primary)] mb-4 flex items-center gap-2">
+              <Sun class="w-4 h-4" />
+              Light Mode Settings
+            </h3>
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <label class="block text-xs text-[var(--text-muted)] mb-1">Background</label>
+                <select
+                  value={lightBackground}
+                  onChange={(e) => { setLightBackground((e.target as HTMLSelectElement).value as LightBackground); showToast('success', 'Theme updated'); }}
+                  class="w-full px-2 py-1.5 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                >
+                  <option value="neutral">Neutral</option>
+                  <option value="warm">Warm</option>
+                  <option value="cool">Cool</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-[var(--text-muted)] mb-1">Accent</label>
+                <select
+                  value={lightAccent}
+                  onChange={(e) => { setLightAccent((e.target as HTMLSelectElement).value as ThemeAccent); showToast('success', 'Theme updated'); }}
+                  class="w-full px-2 py-1.5 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                >
+                  <option value="green">Green</option>
+                  <option value="teal">Teal</option>
+                  <option value="blue">Blue</option>
+                  <option value="orange">Orange</option>
+                  <option value="purple">Purple</option>
+                  <option value="red">Red</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-[var(--text-muted)] mb-1">Style</label>
+                <select
+                  value={lightStyle}
+                  onChange={(e) => { setLightStyle((e.target as HTMLSelectElement).value as ThemeStyle); showToast('success', 'Theme updated'); }}
+                  class="w-full px-2 py-1.5 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                >
+                  <option value="classic">Classic</option>
+                  <option value="glow">Glow</option>
+                  <option value="vibrant">Vibrant</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Bambu Cloud settings */}
       <div class="card">
