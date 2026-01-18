@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "preact/hooks";
+import * as preact from "preact";
 import { useWebSocket } from "../lib/websocket";
 import { api, CloudAuthStatus, VersionInfo, UpdateCheck, UpdateStatus, FirmwareCheck, AMSThresholds } from "../lib/api";
 import { Cloud, CloudOff, LogOut, Loader2, Mail, Lock, Key, Download, RefreshCw, CheckCircle, AlertCircle, GitBranch, ExternalLink, Wifi, WifiOff, Cpu, Usb, RotateCcw, Upload, HardDrive, Palette, Sun, Moon, LayoutDashboard, Settings2, Package, Monitor, Scale, X, ChevronRight, Droplets, Thermometer } from "lucide-preact";
@@ -334,6 +335,74 @@ function AMSSettings() {
 
 type SettingsTab = 'general' | 'filament' | 'system';
 
+// Reusable section card component for consistent styling
+function SettingsCard({
+  id,
+  icon: Icon,
+  title,
+  description,
+  children,
+  headerRight
+}: {
+  id?: string;
+  icon?: typeof Settings2;
+  title: string;
+  description?: string;
+  children: preact.ComponentChildren;
+  headerRight?: preact.ComponentChildren;
+}) {
+  return (
+    <div id={id} class="card overflow-hidden scroll-mt-20">
+      <div class="px-5 py-4 bg-[var(--bg-tertiary)]/50 border-b border-[var(--border-color)]">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            {Icon && (
+              <div class="w-9 h-9 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center flex-shrink-0">
+                <Icon class="w-4.5 h-4.5 text-[var(--accent)]" />
+              </div>
+            )}
+            <div>
+              <h2 class="text-base font-semibold text-[var(--text-primary)]">{title}</h2>
+              {description && (
+                <p class="text-xs text-[var(--text-muted)] mt-0.5">{description}</p>
+              )}
+            </div>
+          </div>
+          {headerRight}
+        </div>
+      </div>
+      <div class="p-5">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Reusable setting row component
+function SettingRow({
+  label,
+  description,
+  children
+}: {
+  label: string;
+  description?: string;
+  children: preact.ComponentChildren;
+}) {
+  return (
+    <div class="flex items-center justify-between gap-4 py-3">
+      <div class="min-w-0 flex-1">
+        <p class="text-sm font-medium text-[var(--text-primary)]">{label}</p>
+        {description && (
+          <p class="text-xs text-[var(--text-muted)] mt-0.5">{description}</p>
+        )}
+      </div>
+      <div class="flex-shrink-0">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function Settings() {
   const { deviceConnected, currentWeight, weightStable } = useWebSocket();
   const { showToast } = useToast();
@@ -367,7 +436,6 @@ export function Settings() {
   const [applyingUpdate, setApplyingUpdate] = useState(false);
 
   // ESP32 Device state
-  const [showTerminal, setShowTerminal] = useState(false);
 
   // Firmware update state
   const [firmwareCheck, setFirmwareCheck] = useState<FirmwareCheck | null>(null);
@@ -765,33 +833,39 @@ export function Settings() {
   return (
     <div class="space-y-6">
       {/* Header */}
-      <div>
-        <h1 class="text-3xl font-bold text-[var(--text-primary)]">Settings</h1>
-        <p class="text-[var(--text-secondary)]">Configure SpoolBuddy</p>
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 class="text-2xl font-bold text-[var(--text-primary)]">Settings</h1>
+          <p class="text-sm text-[var(--text-muted)] mt-1">Configure SpoolBuddy preferences and system options</p>
+        </div>
+        {versionInfo && (
+          <div class="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-color)]">
+            <span class="text-xs text-[var(--text-muted)]">Version</span>
+            <span class="text-sm font-mono font-medium text-[var(--accent)]">v{versionInfo.version}</span>
+          </div>
+        )}
       </div>
 
-      {/* Tab Navigation */}
-      <div class="border-b border-[var(--border-color)]">
-        <nav class="flex gap-1" aria-label="Tabs">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                class={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                  isActive
-                    ? 'border-[var(--accent)] text-[var(--accent)]'
-                    : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-color)]'
-                }`}
-              >
-                <Icon class="w-4 h-4" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
+      {/* Tab Navigation - pill style */}
+      <div class="flex items-center gap-1 p-1 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] w-fit">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              class={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                isActive
+                  ? 'bg-[var(--accent)] text-white shadow-md'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
+              }`}
+            >
+              <Icon class="w-4 h-4" />
+              <span class="hidden sm:inline">{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Tab Content */}
@@ -801,317 +875,312 @@ export function Settings() {
         {activeTab === 'general' && (
           <div class="space-y-6">
             {/* Bambu Cloud settings */}
-            <div id="cloud" class="card scroll-mt-20">
-              <div class="px-6 py-4 border-b border-[var(--border-color)]">
-                <div class="flex items-center gap-2">
-                  <Cloud class="w-5 h-5 text-[var(--text-muted)]" />
-                  <h2 class="text-lg font-medium text-[var(--text-primary)]">Bambu Cloud</h2>
+            <SettingsCard
+              id="cloud"
+              icon={Cloud}
+              title="Bambu Cloud"
+              description="Connect to access your custom filament presets"
+            >
+              {loadingCloud ? (
+                <div class="flex items-center justify-center py-8">
+                  <Loader2 class="w-6 h-6 animate-spin text-[var(--accent)]" />
                 </div>
-              </div>
-              <div class="p-6 space-y-4">
-                {loadingCloud ? (
-                  <div class="flex items-center gap-2 text-[var(--text-muted)]">
-                    <Loader2 class="w-4 h-4 animate-spin" />
-                    <span>Checking cloud status...</span>
-                  </div>
-                ) : cloudStatus?.is_authenticated ? (
-                  <div class="space-y-4">
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
-                          <Cloud class="w-5 h-5 text-green-500" />
-                        </div>
-                        <div>
-                          <p class="text-sm font-medium text-[var(--text-primary)]">Connected</p>
-                          <p class="text-sm text-[var(--text-secondary)]">{cloudStatus.email}</p>
-                        </div>
-                      </div>
-                      <button onClick={handleLogout} class="btn flex items-center gap-2">
-                        <LogOut class="w-4 h-4" />
-                        Logout
-                      </button>
-                    </div>
-                    <p class="text-sm text-[var(--text-muted)]">
-                      Your custom filament presets will be available when adding spools.
-                    </p>
-                  </div>
-                ) : loginStep === 'idle' ? (
-                  <div class="space-y-4">
+              ) : cloudStatus?.is_authenticated ? (
+                <div class="space-y-4">
+                  <div class="flex items-center justify-between p-4 bg-green-500/10 rounded-xl border border-green-500/20">
                     <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 rounded-full bg-[var(--text-muted)]/20 flex items-center justify-center">
-                        <CloudOff class="w-5 h-5 text-[var(--text-muted)]" />
+                      <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                        <Cloud class="w-5 h-5 text-green-500" />
                       </div>
                       <div>
-                        <p class="text-sm font-medium text-[var(--text-primary)]">Not Connected</p>
-                        <p class="text-sm text-[var(--text-secondary)]">Login to access custom filament presets</p>
+                        <p class="text-sm font-semibold text-green-500">Connected</p>
+                        <p class="text-sm text-[var(--text-secondary)]">{cloudStatus.email}</p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => setLoginStep('credentials')}
-                      class="btn btn-primary flex items-center gap-2"
-                    >
-                      <Cloud class="w-4 h-4" />
-                      Login to Bambu Cloud
+                    <button onClick={handleLogout} class="btn btn-ghost flex items-center gap-2">
+                      <LogOut class="w-4 h-4" />
+                      Logout
                     </button>
                   </div>
-                ) : loginStep === 'credentials' ? (
-                  <div class="space-y-4">
-                    <p class="text-sm text-[var(--text-secondary)]">
-                      Enter your Bambu Lab account credentials. A verification code will be sent to your email.
-                    </p>
-                    {loginError && (
-                      <div class="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-500 text-sm">
-                        {loginError}
-                      </div>
-                    )}
-                    <div class="space-y-3">
-                      <div>
-                        <label class="label">Email</label>
-                        <div class="relative">
-                          <Mail class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
-                          <input
-                            type="email"
-                            class="input input-with-icon"
-                            placeholder="your@email.com"
-                            value={email}
-                            onInput={(e) => setEmail((e.target as HTMLInputElement).value)}
-                            disabled={loginLoading}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label class="label">Password</label>
-                        <div class="relative">
-                          <Lock class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
-                          <input
-                            type="password"
-                            class="input input-with-icon"
-                            placeholder="Password"
-                            value={password}
-                            onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
-                            disabled={loginLoading}
-                            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                          />
-                        </div>
-                      </div>
+                  <p class="text-sm text-[var(--text-muted)] pl-1">
+                    Your custom filament presets are now available when adding spools.
+                  </p>
+                </div>
+              ) : loginStep === 'idle' ? (
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-[var(--bg-tertiary)]/50 rounded-xl">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-[var(--text-muted)]/10 flex items-center justify-center">
+                      <CloudOff class="w-5 h-5 text-[var(--text-muted)]" />
                     </div>
-                    <div class="flex gap-3">
-                      <button onClick={cancelLogin} class="btn" disabled={loginLoading}>
-                        Cancel
-                      </button>
-                      <button onClick={handleLogin} class="btn btn-primary flex items-center gap-2" disabled={loginLoading}>
-                        {loginLoading ? <Loader2 class="w-4 h-4 animate-spin" /> : null}
-                        {loginLoading ? 'Logging in...' : 'Login'}
-                      </button>
+                    <div>
+                      <p class="text-sm font-medium text-[var(--text-primary)]">Not Connected</p>
+                      <p class="text-xs text-[var(--text-muted)]">Login to access custom presets</p>
                     </div>
                   </div>
-                ) : (
-                  <div class="space-y-4">
-                    <p class="text-sm text-[var(--text-secondary)]">
-                      A verification code has been sent to <strong>{email}</strong>. Enter it below.
-                    </p>
-                    {loginError && (
-                      <div class="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-500 text-sm">
-                        {loginError}
-                      </div>
-                    )}
+                  <button
+                    onClick={() => setLoginStep('credentials')}
+                    class="btn btn-primary flex items-center gap-2"
+                  >
+                    <Cloud class="w-4 h-4" />
+                    Connect
+                  </button>
+                </div>
+              ) : loginStep === 'credentials' ? (
+                <div class="space-y-4 max-w-md">
+                  <p class="text-sm text-[var(--text-secondary)]">
+                    Enter your Bambu Lab credentials. A verification code will be sent to your email.
+                  </p>
+                  {loginError && (
+                    <div class="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-500 text-sm">
+                      <AlertCircle class="w-4 h-4 flex-shrink-0" />
+                      {loginError}
+                    </div>
+                  )}
+                  <div class="space-y-3">
                     <div>
-                      <label class="label">Verification Code</label>
+                      <label class="label">Email</label>
                       <div class="relative">
-                        <Key class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+                        <Mail class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
                         <input
-                          type="text"
+                          type="email"
                           class="input input-with-icon"
-                          placeholder="Enter 6-digit code"
-                          value={verifyCode}
-                          onInput={(e) => setVerifyCode((e.target as HTMLInputElement).value)}
+                          placeholder="your@email.com"
+                          value={email}
+                          onInput={(e) => setEmail((e.target as HTMLInputElement).value)}
                           disabled={loginLoading}
-                          onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
                         />
                       </div>
                     </div>
-                    <div class="flex gap-3">
-                      <button onClick={cancelLogin} class="btn" disabled={loginLoading}>
-                        Cancel
-                      </button>
-                      <button onClick={handleVerify} class="btn btn-primary flex items-center gap-2" disabled={loginLoading}>
-                        {loginLoading ? <Loader2 class="w-4 h-4 animate-spin" /> : null}
-                        {loginLoading ? 'Verifying...' : 'Verify'}
-                      </button>
+                    <div>
+                      <label class="label">Password</label>
+                      <div class="relative">
+                        <Lock class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+                        <input
+                          type="password"
+                          class="input input-with-icon"
+                          placeholder="Password"
+                          value={password}
+                          onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
+                          disabled={loginLoading}
+                          onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                        />
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
-            </div>
+                  <div class="flex gap-3 pt-2">
+                    <button onClick={cancelLogin} class="btn btn-ghost" disabled={loginLoading}>
+                      Cancel
+                    </button>
+                    <button onClick={handleLogin} class="btn btn-primary flex items-center gap-2" disabled={loginLoading}>
+                      {loginLoading ? <Loader2 class="w-4 h-4 animate-spin" /> : null}
+                      {loginLoading ? 'Logging in...' : 'Continue'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div class="space-y-4 max-w-md">
+                  <p class="text-sm text-[var(--text-secondary)]">
+                    A verification code has been sent to <strong class="text-[var(--text-primary)]">{email}</strong>
+                  </p>
+                  {loginError && (
+                    <div class="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-500 text-sm">
+                      <AlertCircle class="w-4 h-4 flex-shrink-0" />
+                      {loginError}
+                    </div>
+                  )}
+                  <div>
+                    <label class="label">Verification Code</label>
+                    <div class="relative">
+                      <Key class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+                      <input
+                        type="text"
+                        class="input input-with-icon font-mono tracking-wider"
+                        placeholder="000000"
+                        value={verifyCode}
+                        onInput={(e) => setVerifyCode((e.target as HTMLInputElement).value)}
+                        disabled={loginLoading}
+                        onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
+                      />
+                    </div>
+                  </div>
+                  <div class="flex gap-3 pt-2">
+                    <button onClick={cancelLogin} class="btn btn-ghost" disabled={loginLoading}>
+                      Cancel
+                    </button>
+                    <button onClick={handleVerify} class="btn btn-primary flex items-center gap-2" disabled={loginLoading}>
+                      {loginLoading ? <Loader2 class="w-4 h-4 animate-spin" /> : null}
+                      {loginLoading ? 'Verifying...' : 'Verify'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </SettingsCard>
 
             {/* Appearance Settings */}
-            <div id="appearance" class="card scroll-mt-20">
-              <div class="px-6 py-4 border-b border-[var(--border-color)]">
-                <div class="flex items-center gap-2">
-                  <Palette class="w-5 h-5 text-[var(--text-muted)]" />
-                  <h2 class="text-lg font-medium text-[var(--text-primary)]">Appearance</h2>
-                </div>
-              </div>
-              <div class="p-6 space-y-6">
+            <SettingsCard
+              id="appearance"
+              icon={Palette}
+              title="Appearance"
+              description="Customize the look and feel"
+            >
+              <div class="space-y-6">
                 {/* Mode Toggle */}
-                <div class="flex items-center justify-between">
-                  <div>
-                    <p class="text-sm font-medium text-[var(--text-primary)]">Theme Mode</p>
-                    <p class="text-sm text-[var(--text-secondary)]">Switch between light and dark mode</p>
-                  </div>
+                <SettingRow
+                  label="Theme Mode"
+                  description="Switch between light and dark mode"
+                >
                   <button
                     onClick={toggleMode}
-                    class="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--border-color)] transition-colors"
+                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--bg-tertiary)] hover:bg-[var(--border-color)] transition-all border border-[var(--border-color)]"
                   >
                     {mode === "dark" ? (
                       <>
                         <Moon class="w-4 h-4 text-[var(--accent)]" />
-                        <span class="text-sm text-[var(--text-primary)]">Dark</span>
+                        <span class="text-sm font-medium text-[var(--text-primary)]">Dark</span>
                       </>
                     ) : (
                       <>
                         <Sun class="w-4 h-4 text-[var(--accent)]" />
-                        <span class="text-sm text-[var(--text-primary)]">Light</span>
+                        <span class="text-sm font-medium text-[var(--text-primary)]">Light</span>
                       </>
                     )}
                   </button>
-                </div>
+                </SettingRow>
 
-                {/* Dark Mode Settings */}
-                <div class="border-t border-[var(--border-color)] pt-6">
-                  <h3 class="text-sm font-medium text-[var(--text-primary)] mb-4 flex items-center gap-2">
-                    <Moon class="w-4 h-4" />
-                    Dark Mode Settings
-                  </h3>
-                  <div class="grid grid-cols-3 gap-4">
-                    <div>
-                      <label class="block text-xs text-[var(--text-muted)] mb-1">Background</label>
-                      <select
-                        value={darkBackground}
-                        onChange={(e) => { setDarkBackground((e.target as HTMLSelectElement).value as DarkBackground); showToast('success', 'Theme updated'); }}
-                        class="w-full px-2 py-1.5 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
-                      >
-                        <option value="neutral">Neutral</option>
-                        <option value="warm">Warm</option>
-                        <option value="cool">Cool</option>
-                        <option value="oled">OLED Black</option>
-                        <option value="slate">Slate</option>
-                        <option value="forest">Forest</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label class="block text-xs text-[var(--text-muted)] mb-1">Accent</label>
-                      <select
-                        value={darkAccent}
-                        onChange={(e) => { setDarkAccent((e.target as HTMLSelectElement).value as ThemeAccent); showToast('success', 'Theme updated'); }}
-                        class="w-full px-2 py-1.5 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
-                      >
-                        <option value="green">Green</option>
-                        <option value="teal">Teal</option>
-                        <option value="blue">Blue</option>
-                        <option value="orange">Orange</option>
-                        <option value="purple">Purple</option>
-                        <option value="red">Red</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label class="block text-xs text-[var(--text-muted)] mb-1">Style</label>
-                      <select
-                        value={darkStyle}
-                        onChange={(e) => { setDarkStyle((e.target as HTMLSelectElement).value as ThemeStyle); showToast('success', 'Theme updated'); }}
-                        class="w-full px-2 py-1.5 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
-                      >
-                        <option value="classic">Classic</option>
-                        <option value="glow">Glow</option>
-                        <option value="vibrant">Vibrant</option>
-                      </select>
+                {/* Theme customization panels */}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Dark Mode Settings */}
+                  <div class="p-4 rounded-xl bg-[var(--bg-tertiary)]/50 border border-[var(--border-color)]">
+                    <h3 class="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+                      <Moon class="w-4 h-4 text-[var(--accent)]" />
+                      Dark Mode
+                    </h3>
+                    <div class="space-y-3">
+                      <div>
+                        <label class="block text-xs text-[var(--text-muted)] mb-1.5">Background</label>
+                        <select
+                          value={darkBackground}
+                          onChange={(e) => { setDarkBackground((e.target as HTMLSelectElement).value as DarkBackground); showToast('success', 'Theme updated'); }}
+                          class="w-full px-3 py-2 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                        >
+                          <option value="neutral">Neutral</option>
+                          <option value="warm">Warm</option>
+                          <option value="cool">Cool</option>
+                          <option value="oled">OLED Black</option>
+                          <option value="slate">Slate</option>
+                          <option value="forest">Forest</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="block text-xs text-[var(--text-muted)] mb-1.5">Accent Color</label>
+                        <select
+                          value={darkAccent}
+                          onChange={(e) => { setDarkAccent((e.target as HTMLSelectElement).value as ThemeAccent); showToast('success', 'Theme updated'); }}
+                          class="w-full px-3 py-2 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                        >
+                          <option value="green">Green</option>
+                          <option value="teal">Teal</option>
+                          <option value="blue">Blue</option>
+                          <option value="orange">Orange</option>
+                          <option value="purple">Purple</option>
+                          <option value="red">Red</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="block text-xs text-[var(--text-muted)] mb-1.5">Style</label>
+                        <select
+                          value={darkStyle}
+                          onChange={(e) => { setDarkStyle((e.target as HTMLSelectElement).value as ThemeStyle); showToast('success', 'Theme updated'); }}
+                          class="w-full px-3 py-2 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                        >
+                          <option value="classic">Classic</option>
+                          <option value="glow">Glow</option>
+                          <option value="vibrant">Vibrant</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Light Mode Settings */}
-                <div class="border-t border-[var(--border-color)] pt-6">
-                  <h3 class="text-sm font-medium text-[var(--text-primary)] mb-4 flex items-center gap-2">
-                    <Sun class="w-4 h-4" />
-                    Light Mode Settings
-                  </h3>
-                  <div class="grid grid-cols-3 gap-4">
-                    <div>
-                      <label class="block text-xs text-[var(--text-muted)] mb-1">Background</label>
-                      <select
-                        value={lightBackground}
-                        onChange={(e) => { setLightBackground((e.target as HTMLSelectElement).value as LightBackground); showToast('success', 'Theme updated'); }}
-                        class="w-full px-2 py-1.5 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
-                      >
-                        <option value="neutral">Neutral</option>
-                        <option value="warm">Warm</option>
-                        <option value="cool">Cool</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label class="block text-xs text-[var(--text-muted)] mb-1">Accent</label>
-                      <select
-                        value={lightAccent}
-                        onChange={(e) => { setLightAccent((e.target as HTMLSelectElement).value as ThemeAccent); showToast('success', 'Theme updated'); }}
-                        class="w-full px-2 py-1.5 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
-                      >
-                        <option value="green">Green</option>
-                        <option value="teal">Teal</option>
-                        <option value="blue">Blue</option>
-                        <option value="orange">Orange</option>
-                        <option value="purple">Purple</option>
-                        <option value="red">Red</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label class="block text-xs text-[var(--text-muted)] mb-1">Style</label>
-                      <select
-                        value={lightStyle}
-                        onChange={(e) => { setLightStyle((e.target as HTMLSelectElement).value as ThemeStyle); showToast('success', 'Theme updated'); }}
-                        class="w-full px-2 py-1.5 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
-                      >
-                        <option value="classic">Classic</option>
-                        <option value="glow">Glow</option>
-                        <option value="vibrant">Vibrant</option>
-                      </select>
+                  {/* Light Mode Settings */}
+                  <div class="p-4 rounded-xl bg-[var(--bg-tertiary)]/50 border border-[var(--border-color)]">
+                    <h3 class="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+                      <Sun class="w-4 h-4 text-[var(--accent)]" />
+                      Light Mode
+                    </h3>
+                    <div class="space-y-3">
+                      <div>
+                        <label class="block text-xs text-[var(--text-muted)] mb-1.5">Background</label>
+                        <select
+                          value={lightBackground}
+                          onChange={(e) => { setLightBackground((e.target as HTMLSelectElement).value as LightBackground); showToast('success', 'Theme updated'); }}
+                          class="w-full px-3 py-2 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                        >
+                          <option value="neutral">Neutral</option>
+                          <option value="warm">Warm</option>
+                          <option value="cool">Cool</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="block text-xs text-[var(--text-muted)] mb-1.5">Accent Color</label>
+                        <select
+                          value={lightAccent}
+                          onChange={(e) => { setLightAccent((e.target as HTMLSelectElement).value as ThemeAccent); showToast('success', 'Theme updated'); }}
+                          class="w-full px-3 py-2 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                        >
+                          <option value="green">Green</option>
+                          <option value="teal">Teal</option>
+                          <option value="blue">Blue</option>
+                          <option value="orange">Orange</option>
+                          <option value="purple">Purple</option>
+                          <option value="red">Red</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="block text-xs text-[var(--text-muted)] mb-1.5">Style</label>
+                        <select
+                          value={lightStyle}
+                          onChange={(e) => { setLightStyle((e.target as HTMLSelectElement).value as ThemeStyle); showToast('success', 'Theme updated'); }}
+                          class="w-full px-3 py-2 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                        >
+                          <option value="classic">Classic</option>
+                          <option value="glow">Glow</option>
+                          <option value="vibrant">Vibrant</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </SettingsCard>
 
             {/* About */}
-            <div id="about" class="card scroll-mt-20">
-              <div class="px-6 py-4 border-b border-[var(--border-color)]">
-                <h2 class="text-lg font-medium text-[var(--text-primary)]">About</h2>
+            <SettingsCard
+              id="about"
+              icon={ExternalLink}
+              title="About SpoolBuddy"
+              description="Filament management for Bambu Lab printers"
+            >
+              <div class="flex items-center gap-4">
+                <a
+                  href="https://github.com/maziggy/spoolbuddy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="flex items-center gap-2 text-sm text-[var(--accent)] hover:underline"
+                >
+                  <GitBranch class="w-4 h-4" />
+                  GitHub
+                </a>
+                <a
+                  href="https://github.com/maziggy/spoolbuddy/issues"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="flex items-center gap-2 text-sm text-[var(--accent)] hover:underline"
+                >
+                  <AlertCircle class="w-4 h-4" />
+                  Report Issue
+                </a>
               </div>
-              <div class="p-6">
-                <p class="text-sm text-[var(--text-secondary)]">
-                  SpoolBuddy is a filament management system for Bambu Lab 3D printers.
-                </p>
-                <p class="mt-2 text-sm text-[var(--text-secondary)]">
-                  Features include NFC tag reading, weight scale integration, and automatic AMS configuration.
-                </p>
-                <div class="mt-4 flex space-x-4">
-                  <a
-                    href="https://github.com/maziggy/spoolbuddy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-sm text-[var(--accent-color)] hover:text-[var(--accent-hover)]"
-                  >
-                    GitHub
-                  </a>
-                  <a
-                    href="https://github.com/maziggy/spoolbuddy/issues"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-sm text-[var(--accent-color)] hover:text-[var(--accent-hover)]"
-                  >
-                    Report Issue
-                  </a>
-                </div>
-              </div>
-            </div>
+            </SettingsCard>
           </div>
         )}
 
@@ -1142,16 +1211,18 @@ export function Settings() {
         {activeTab === 'system' && (
           <div class="space-y-6">
             {/* ESP32 Device Connection */}
-            <div id="device" class="card scroll-mt-20">
-              <div class="px-6 py-4 border-b border-[var(--border-color)]">
-                <div class="flex items-center gap-2">
-                  <Cpu class="w-5 h-5 text-[var(--text-muted)]" />
-                  <h2 class="text-lg font-medium text-[var(--text-primary)]">ESP32 Device</h2>
-                </div>
-              </div>
-              <div class="p-6 space-y-6">
+            <SettingsCard
+              id="device"
+              icon={Cpu}
+              title="ESP32 Device"
+              description="SpoolBuddy hardware status and controls"
+            >
+              <div class="space-y-5">
                 {/* Connection Status */}
-                <div class="flex items-center justify-between">
+                <div class={`flex items-center justify-between p-4 rounded-xl border ${
+                  deviceUpdating ? 'bg-yellow-500/10 border-yellow-500/20' :
+                  deviceConnected ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20'
+                }`}>
                   <div class="flex items-center gap-3">
                     <div class={`w-10 h-10 rounded-full ${
                       deviceUpdating ? 'bg-yellow-500/20' :
@@ -1166,59 +1237,78 @@ export function Settings() {
                       )}
                     </div>
                     <div>
-                      <p class="text-sm font-medium text-[var(--text-primary)]">
+                      <p class={`text-sm font-semibold ${
+                        deviceUpdating ? 'text-yellow-500' :
+                        deviceConnected ? 'text-green-500' : 'text-red-500'
+                      }`}>
                         {deviceUpdating ? 'Updating...' : deviceConnected ? 'Connected' : 'Disconnected'}
                       </p>
-                      <p class="text-sm text-[var(--text-secondary)]">
-                        {deviceUpdating ? 'Device is rebooting and installing firmware' :
-                         deviceConnected ? 'Display is sending heartbeats' : 'No heartbeat from display'}
+                      <p class="text-xs text-[var(--text-muted)]">
+                        {deviceUpdating ? 'Rebooting and installing firmware' :
+                         deviceConnected ? 'Display sending heartbeats' : 'No heartbeat from display'}
                       </p>
                     </div>
                   </div>
+                  {deviceConnected && !deviceUpdating && (
+                    <button onClick={handleESP32Reboot} class="btn btn-ghost flex items-center gap-2">
+                      <RotateCcw class="w-4 h-4" />
+                      <span class="hidden sm:inline">Reboot</span>
+                    </button>
+                  )}
                 </div>
 
-                {/* Scale reading */}
-                <div class="border-t border-[var(--border-color)] pt-6">
-                  <h3 class="text-sm font-medium text-[var(--text-primary)]">Scale</h3>
-                  <div class="mt-4 flex items-center justify-between">
-                    <div>
-                      <p class="text-sm text-[var(--text-secondary)]">Current reading</p>
-                      <p class="text-2xl font-mono text-[var(--text-primary)]">
-                        {currentWeight !== null ? `${Math.round(currentWeight)}g` : "--"}
-                      </p>
+                {/* Scale Section */}
+                <div class="p-4 rounded-xl bg-[var(--bg-tertiary)]/50 border border-[var(--border-color)]">
+                  <div class="flex items-center gap-2 mb-4">
+                    <Scale class="w-4 h-4 text-[var(--accent)]" />
+                    <h3 class="text-sm font-semibold text-[var(--text-primary)]">Scale</h3>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                      <div class="text-3xl font-mono font-bold text-[var(--text-primary)]">
+                        {currentWeight !== null ? `${Math.round(currentWeight)}g` : "—"}
+                      </div>
+                      {weightStable && currentWeight !== null && (
+                        <span class="flex items-center gap-1.5 text-xs text-green-500 bg-green-500/10 px-2 py-1 rounded-full">
+                          <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                          Stable
+                        </span>
+                      )}
                     </div>
-                    <div class="space-x-3">
-                      <button onClick={handleTare} disabled={!deviceConnected} class="btn">
+                    <div class="flex gap-2">
+                      <button onClick={handleTare} disabled={!deviceConnected} class="btn btn-ghost">
                         Tare
                       </button>
-                      <button onClick={startCalibration} disabled={!deviceConnected} class="btn">
+                      <button onClick={startCalibration} disabled={!deviceConnected} class="btn btn-primary">
                         Calibrate
                       </button>
                     </div>
                   </div>
-                  <div class="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+
+                  {/* Reset calibration warning */}
+                  <div class="mt-4 pt-4 border-t border-[var(--border-color)]">
                     {!showResetConfirm ? (
                       <div class="flex items-center justify-between">
-                        <p class="text-xs text-yellow-600 dark:text-yellow-400">
-                          Only reset if calibration produces completely wrong values.
+                        <p class="text-xs text-[var(--text-muted)]">
+                          Only reset if calibration produces completely wrong values
                         </p>
                         <button
                           onClick={() => setShowResetConfirm(true)}
                           disabled={!deviceConnected}
-                          class="px-3 py-1 text-xs bg-yellow-500 hover:bg-yellow-600 text-white rounded disabled:opacity-50"
+                          class="text-xs text-yellow-500 hover:text-yellow-400 font-medium disabled:opacity-50"
                         >
-                          Reset
+                          Reset Calibration
                         </button>
                       </div>
                     ) : (
-                      <div class="space-y-2">
-                        <p class="text-xs text-yellow-600 dark:text-yellow-400 font-medium">
-                          Are you sure? You will need to recalibrate the scale.
+                      <div class="flex items-center justify-between p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                        <p class="text-xs text-red-400 font-medium">
+                          Reset calibration? You'll need to recalibrate.
                         </p>
                         <div class="flex gap-2">
                           <button
                             onClick={() => setShowResetConfirm(false)}
-                            class="px-3 py-1 text-xs bg-[var(--bg-tertiary)] hover:bg-[var(--border-color)] text-[var(--text-primary)] rounded"
+                            class="btn btn-ghost btn-sm"
                           >
                             Cancel
                           </button>
@@ -1227,9 +1317,9 @@ export function Settings() {
                               handleResetCalibration();
                               setShowResetConfirm(false);
                             }}
-                            class="px-3 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded"
+                            class="btn btn-danger btn-sm"
                           >
-                            Yes, Reset
+                            Reset
                           </button>
                         </div>
                       </div>
@@ -1237,124 +1327,114 @@ export function Settings() {
                   </div>
                 </div>
 
-                {deviceConnected && (
-                  <div class="border-t border-[var(--border-color)] pt-6 flex gap-3">
-                    <button onClick={handleESP32Reboot} class="btn flex items-center gap-2">
-                      <RotateCcw class="w-4 h-4" />
-                      Reboot Device
-                    </button>
-                  </div>
-                )}
-
                 {/* USB Serial Terminal */}
-                <div class="border-t border-[var(--border-color)] pt-6">
-                  <button
-                    onClick={() => setShowTerminal(!showTerminal)}
-                    class="flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                  >
+                <details class="group">
+                  <summary class="flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer list-none">
                     <Usb class="w-4 h-4" />
                     <span>USB Serial Terminal</span>
-                    <span class="text-xs">{showTerminal ? '▲' : '▼'}</span>
-                  </button>
-                  {showTerminal && (
-                    <div class="mt-4">
-                      <SerialTerminal />
-                    </div>
-                  )}
-                </div>
+                    <ChevronRight class="w-4 h-4 transition-transform group-open:rotate-90" />
+                  </summary>
+                  <div class="mt-4">
+                    <SerialTerminal />
+                  </div>
+                </details>
               </div>
-            </div>
+            </SettingsCard>
 
             {/* Software Updates */}
-            <div id="updates" class="card scroll-mt-20">
-              <div class="px-6 py-4 border-b border-[var(--border-color)]">
-                <div class="flex items-center gap-2">
-                  <Download class="w-5 h-5 text-[var(--text-muted)]" />
-                  <h2 class="text-lg font-medium text-[var(--text-primary)]">Software Updates</h2>
-                </div>
-              </div>
-              <div class="p-6 space-y-6">
+            <SettingsCard
+              id="updates"
+              icon={Download}
+              title="Software Updates"
+              description="Keep SpoolBuddy up to date"
+              headerRight={
+                <button
+                  onClick={() => handleCheckUpdates(true)}
+                  disabled={checkingUpdate || applyingUpdate}
+                  class="btn btn-ghost flex items-center gap-2"
+                >
+                  {checkingUpdate ? (
+                    <Loader2 class="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw class="w-4 h-4" />
+                  )}
+                  <span class="hidden sm:inline">{checkingUpdate ? 'Checking...' : 'Check'}</span>
+                </button>
+              }
+            >
+              <div class="space-y-5">
                 {/* Current Version */}
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-tertiary)]/50 border border-[var(--border-color)]">
                   <div>
-                    <h3 class="text-sm font-medium text-[var(--text-primary)]">Current Version</h3>
-                    <div class="flex items-center gap-3 mt-1">
-                      <span class="text-lg font-mono text-[var(--accent-color)]">
+                    <p class="text-xs text-[var(--text-muted)] mb-1">Server Version</p>
+                    <div class="flex items-center gap-3">
+                      <span class="text-xl font-mono font-bold text-[var(--accent)]">
                         v{versionInfo?.version || '0.1.0'}
                       </span>
                       {versionInfo?.git_branch && (
-                        <span class="inline-flex items-center gap-1 text-xs text-[var(--text-muted)] bg-[var(--card-bg)] px-2 py-1 rounded">
+                        <span class="inline-flex items-center gap-1 text-xs text-[var(--text-muted)] bg-[var(--bg-secondary)] px-2 py-1 rounded-full">
                           <GitBranch class="w-3 h-3" />
                           {versionInfo.git_branch}
-                          {versionInfo.git_commit && ` (${versionInfo.git_commit})`}
                         </span>
                       )}
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleCheckUpdates(true)}
-                    disabled={checkingUpdate || applyingUpdate}
-                    class="btn flex items-center gap-2"
-                  >
-                    {checkingUpdate ? (
-                      <Loader2 class="w-4 h-4 animate-spin" />
-                    ) : (
-                      <RefreshCw class="w-4 h-4" />
-                    )}
-                    {checkingUpdate ? 'Checking...' : 'Check for Updates'}
-                  </button>
+                  {updateCheck && !updateCheck.update_available && !updateCheck.error && (
+                    <div class="flex items-center gap-2 text-green-500 bg-green-500/10 px-3 py-1.5 rounded-full">
+                      <CheckCircle class="w-4 h-4" />
+                      <span class="text-xs font-medium">Up to date</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Update Available */}
                 {updateCheck && updateCheck.update_available && (
-                  <div class="border-t border-[var(--border-color)] pt-4">
-                    <div class="p-4 bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/30 rounded-lg">
-                      <div class="flex items-start justify-between">
-                        <div>
-                          <div class="flex items-center gap-2">
-                            <CheckCircle class="w-5 h-5 text-[var(--accent-color)]" />
-                            <h3 class="text-sm font-medium text-[var(--text-primary)]">
-                              Update Available: v{updateCheck.latest_version}
-                            </h3>
-                          </div>
-                          {updateCheck.published_at && (
-                            <p class="text-xs text-[var(--text-muted)] mt-1">
-                              Released: {new Date(updateCheck.published_at).toLocaleDateString()}
-                            </p>
-                          )}
-                          {updateCheck.release_notes && (
-                            <p class="text-sm text-[var(--text-secondary)] mt-2 whitespace-pre-wrap">
-                              {updateCheck.release_notes.length > 200
-                                ? updateCheck.release_notes.slice(0, 200) + '...'
-                                : updateCheck.release_notes}
-                            </p>
-                          )}
+                  <div class="p-4 bg-[var(--accent)]/10 border border-[var(--accent)]/20 rounded-xl">
+                    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                      <div>
+                        <div class="flex items-center gap-2">
+                          <Download class="w-5 h-5 text-[var(--accent)]" />
+                          <h3 class="text-sm font-semibold text-[var(--text-primary)]">
+                            Update Available: v{updateCheck.latest_version}
+                          </h3>
                         </div>
-                        <div class="flex gap-2">
-                          {updateCheck.release_url && (
-                            <a
-                              href={updateCheck.release_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              class="btn flex items-center gap-2"
-                            >
-                              <ExternalLink class="w-4 h-4" />
-                              View
-                            </a>
-                          )}
-                          <button
-                            onClick={handleApplyUpdate}
-                            disabled={applyingUpdate}
-                            class="btn btn-primary flex items-center gap-2"
+                        {updateCheck.published_at && (
+                          <p class="text-xs text-[var(--text-muted)] mt-1 ml-7">
+                            Released {new Date(updateCheck.published_at).toLocaleDateString()}
+                          </p>
+                        )}
+                        {updateCheck.release_notes && (
+                          <p class="text-sm text-[var(--text-secondary)] mt-3 ml-7">
+                            {updateCheck.release_notes.length > 200
+                              ? updateCheck.release_notes.slice(0, 200) + '...'
+                              : updateCheck.release_notes}
+                          </p>
+                        )}
+                      </div>
+                      <div class="flex gap-2 sm:flex-shrink-0">
+                        {updateCheck.release_url && (
+                          <a
+                            href={updateCheck.release_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="btn btn-ghost flex items-center gap-2"
                           >
-                            {applyingUpdate ? (
-                              <Loader2 class="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Download class="w-4 h-4" />
-                            )}
-                            {applyingUpdate ? 'Updating...' : 'Update Now'}
-                          </button>
-                        </div>
+                            <ExternalLink class="w-4 h-4" />
+                            View
+                          </a>
+                        )}
+                        <button
+                          onClick={handleApplyUpdate}
+                          disabled={applyingUpdate}
+                          class="btn btn-primary flex items-center gap-2"
+                        >
+                          {applyingUpdate ? (
+                            <Loader2 class="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Download class="w-4 h-4" />
+                          )}
+                          {applyingUpdate ? 'Updating...' : 'Update'}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1362,68 +1442,59 @@ export function Settings() {
 
                 {/* Update Status */}
                 {updateStatus && updateStatus.status !== 'idle' && (
-                  <div class="border-t border-[var(--border-color)] pt-4">
-                    <div class={`p-4 rounded-lg ${
-                      updateStatus.status === 'error'
-                        ? 'bg-red-500/10 border border-red-500/30'
-                        : updateStatus.status === 'restarting'
-                        ? 'bg-green-500/10 border border-green-500/30'
-                        : 'bg-[var(--card-bg)] border border-[var(--border-color)]'
-                    }`}>
-                      <div class="flex items-center gap-2">
-                        {updateStatus.status === 'error' ? (
-                          <AlertCircle class="w-5 h-5 text-red-500" />
-                        ) : updateStatus.status === 'restarting' ? (
-                          <CheckCircle class="w-5 h-5 text-green-500" />
-                        ) : (
-                          <Loader2 class="w-5 h-5 animate-spin text-[var(--accent-color)]" />
-                        )}
-                        <span class={`text-sm font-medium ${
-                          updateStatus.status === 'error'
-                            ? 'text-red-500'
-                            : updateStatus.status === 'restarting'
-                            ? 'text-green-500'
-                            : 'text-[var(--text-primary)]'
-                        }`}>
-                          {updateStatus.message || updateStatus.status}
-                        </span>
-                      </div>
-                      {updateStatus.error && (
-                        <p class="text-sm text-red-500 mt-2">{updateStatus.error}</p>
+                  <div class={`p-4 rounded-xl ${
+                    updateStatus.status === 'error'
+                      ? 'bg-red-500/10 border border-red-500/20'
+                      : updateStatus.status === 'restarting'
+                      ? 'bg-green-500/10 border border-green-500/20'
+                      : 'bg-[var(--bg-tertiary)]/50 border border-[var(--border-color)]'
+                  }`}>
+                    <div class="flex items-center gap-2">
+                      {updateStatus.status === 'error' ? (
+                        <AlertCircle class="w-5 h-5 text-red-500" />
+                      ) : updateStatus.status === 'restarting' ? (
+                        <CheckCircle class="w-5 h-5 text-green-500" />
+                      ) : (
+                        <Loader2 class="w-5 h-5 animate-spin text-[var(--accent)]" />
                       )}
+                      <span class={`text-sm font-medium ${
+                        updateStatus.status === 'error'
+                          ? 'text-red-500'
+                          : updateStatus.status === 'restarting'
+                          ? 'text-green-500'
+                          : 'text-[var(--text-primary)]'
+                      }`}>
+                        {updateStatus.message || updateStatus.status}
+                      </span>
                     </div>
-                  </div>
-                )}
-
-                {/* No Updates */}
-                {updateCheck && !updateCheck.update_available && !updateCheck.error && (
-                  <div class="border-t border-[var(--border-color)] pt-4">
-                    <div class="flex items-center gap-2 text-green-500">
-                      <CheckCircle class="w-5 h-5" />
-                      <span class="text-sm">You are running the latest version</span>
-                    </div>
+                    {updateStatus.error && (
+                      <p class="text-sm text-red-400 mt-2 ml-7">{updateStatus.error}</p>
+                    )}
                   </div>
                 )}
 
                 {/* Device Firmware Section */}
-                <div class="border-t border-[var(--border-color)] pt-6">
+                <div class="pt-4 border-t border-[var(--border-color)]">
                   <div class="flex items-center gap-2 mb-4">
-                    <HardDrive class="w-5 h-5 text-[var(--text-muted)]" />
-                    <h3 class="text-sm font-medium text-[var(--text-primary)]">Device Firmware</h3>
+                    <HardDrive class="w-4 h-4 text-[var(--accent)]" />
+                    <h3 class="text-sm font-semibold text-[var(--text-primary)]">Device Firmware</h3>
                   </div>
 
                   {/* Device Status */}
-                  <div class="p-4 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg mb-4">
+                  <div class={`p-4 rounded-xl border ${
+                    deviceUpdating ? 'bg-yellow-500/10 border-yellow-500/20' :
+                    deviceConnected ? 'bg-[var(--bg-tertiary)]/50 border-[var(--border-color)]' : 'bg-[var(--bg-tertiary)]/30 border-[var(--border-color)]'
+                  }`}>
                     <div class="flex items-center justify-between">
                       <div class="flex items-center gap-3">
                         <div class={`w-10 h-10 rounded-full flex items-center justify-center ${
                           deviceUpdating ? 'bg-yellow-500/20' :
-                          deviceConnected ? 'bg-green-500/20' : 'bg-gray-500/20'
+                          deviceConnected ? 'bg-green-500/20' : 'bg-[var(--text-muted)]/10'
                         }`}>
                           {deviceUpdating ? (
                             <Loader2 class="w-5 h-5 text-yellow-500 animate-spin" />
                           ) : (
-                            <Cpu class={`w-5 h-5 ${deviceConnected ? 'text-green-500' : 'text-gray-400'}`} />
+                            <Cpu class={`w-5 h-5 ${deviceConnected ? 'text-green-500' : 'text-[var(--text-muted)]'}`} />
                           )}
                         </div>
                         <div>
@@ -1431,13 +1502,13 @@ export function Settings() {
                             {deviceUpdating ? 'Updating Device...' :
                              deviceConnected ? 'SpoolBuddy Display' : 'No Device Connected'}
                           </p>
-                          <p class="text-sm text-[var(--text-muted)] font-mono">
-                            {deviceUpdating ? 'Rebooting and installing firmware...' :
+                          <p class="text-xs text-[var(--text-muted)] font-mono">
+                            {deviceUpdating ? 'Installing firmware...' :
                              deviceConnected ? (
                               deviceFirmwareVersion || firmwareCheck?.current_version
                                 ? `v${deviceFirmwareVersion || firmwareCheck?.current_version}`
-                                : 'Version unknown - update to enable reporting'
-                             ) : 'Connect device via WiFi'}
+                                : 'Version unknown'
+                             ) : 'Connect via WiFi'}
                           </p>
                         </div>
                       </div>
@@ -1445,19 +1516,14 @@ export function Settings() {
                         <button
                           onClick={handleCheckFirmware}
                           disabled={checkingFirmware}
-                          class="btn flex items-center gap-2"
+                          class="btn btn-ghost flex items-center gap-2"
                         >
                           {checkingFirmware ? (
-                            <>
-                              <Loader2 class="w-4 h-4 animate-spin" />
-                              Checking...
-                            </>
+                            <Loader2 class="w-4 h-4 animate-spin" />
                           ) : (
-                            <>
-                              <RefreshCw class="w-4 h-4" />
-                              Check for Updates
-                            </>
+                            <RefreshCw class="w-4 h-4" />
                           )}
+                          <span class="hidden sm:inline">{checkingFirmware ? 'Checking...' : 'Check'}</span>
                         </button>
                       )}
                     </div>
@@ -1465,75 +1531,63 @@ export function Settings() {
 
                   {/* Firmware Update Available */}
                   {firmwareCheck?.update_available && !deviceUpdating && (
-                    <div class="p-4 bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/30 rounded-lg mb-4">
-                      <div class="flex items-start gap-3">
-                        <div class="w-10 h-10 rounded-full bg-[var(--accent-color)]/20 flex items-center justify-center flex-shrink-0">
-                          <Download class="w-5 h-5 text-[var(--accent-color)]" />
-                        </div>
-                        <div class="flex-1">
-                          <p class="text-sm font-medium text-[var(--text-primary)]">
-                            Update Available: v{firmwareCheck.latest_version}
-                          </p>
-                          <p class="text-sm text-[var(--text-secondary)] mt-1">
-                            {deviceFirmwareVersion || firmwareCheck?.current_version
-                              ? `Your device is running v${deviceFirmwareVersion || firmwareCheck.current_version}.`
-                              : 'Your device is running an older version without version reporting.'}
-                            {' '}Click update to install the new firmware.
-                          </p>
-                          <div class="mt-3 p-3 bg-[var(--bg-secondary)] rounded text-xs text-[var(--text-muted)]">
-                            <p class="font-medium mb-1">What will happen:</p>
-                            <ol class="list-decimal list-inside space-y-1">
-                              <li>Device will reboot</li>
-                              <li>Download new firmware (~4.5MB)</li>
-                              <li>Install and reboot again</li>
-                            </ol>
-                            <p class="mt-2">This takes about 1-2 minutes. Do not power off the device.</p>
+                    <div class="mt-4 p-4 bg-[var(--accent)]/10 border border-[var(--accent)]/20 rounded-xl">
+                      <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                        <div>
+                          <div class="flex items-center gap-2">
+                            <Download class="w-5 h-5 text-[var(--accent)]" />
+                            <h4 class="text-sm font-semibold text-[var(--text-primary)]">
+                              Firmware v{firmwareCheck.latest_version} Available
+                            </h4>
                           </div>
-                          <button
-                            onClick={handleTriggerOTA}
-                            disabled={!deviceConnected}
-                            class="btn btn-primary flex items-center gap-2 mt-3"
-                          >
-                            <Download class="w-4 h-4" />
-                            Update to v{firmwareCheck.latest_version}
-                          </button>
+                          <p class="text-xs text-[var(--text-muted)] mt-2 ml-7">
+                            {deviceFirmwareVersion || firmwareCheck?.current_version
+                              ? `Current: v${deviceFirmwareVersion || firmwareCheck.current_version}`
+                              : 'Current version unknown'}
+                          </p>
                         </div>
+                        <button
+                          onClick={handleTriggerOTA}
+                          disabled={!deviceConnected}
+                          class="btn btn-primary flex items-center gap-2"
+                        >
+                          <Download class="w-4 h-4" />
+                          Update
+                        </button>
                       </div>
                     </div>
                   )}
 
                   {/* Firmware Up to Date */}
                   {firmwareCheck && !firmwareCheck.update_available && (deviceFirmwareVersion || firmwareCheck.current_version) && !deviceUpdating && (
-                    <div class="p-4 bg-green-500/10 border border-green-500/30 rounded-lg mb-4">
-                      <div class="flex items-center gap-3">
-                        <CheckCircle class="w-5 h-5 text-green-500" />
-                        <p class="text-sm text-green-600">
-                          Your device is up to date (v{deviceFirmwareVersion || firmwareCheck.current_version})
-                        </p>
-                      </div>
+                    <div class="mt-4 flex items-center gap-2 text-green-500 bg-green-500/10 px-3 py-2 rounded-lg w-fit">
+                      <CheckCircle class="w-4 h-4" />
+                      <span class="text-xs font-medium">Firmware up to date</span>
                     </div>
                   )}
 
                   {/* Upload Firmware (for developers) */}
-                  <details class="group">
-                    <summary class="cursor-pointer text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
-                      Developer: Upload custom firmware
+                  <details class="group mt-4">
+                    <summary class="flex items-center gap-2 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer list-none">
+                      <Upload class="w-3.5 h-3.5" />
+                      <span>Upload custom firmware</span>
+                      <ChevronRight class="w-3.5 h-3.5 transition-transform group-open:rotate-90" />
                     </summary>
-                    <div class="mt-2 p-4 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg">
+                    <div class="mt-3 p-4 bg-[var(--bg-tertiary)]/50 border border-[var(--border-color)] rounded-xl">
                       <div class="flex items-center justify-between">
                         <div>
-                          <p class="text-sm font-medium text-[var(--text-primary)]">Upload Firmware Binary</p>
+                          <p class="text-sm font-medium text-[var(--text-primary)]">Upload .bin File</p>
                           <p class="text-xs text-[var(--text-muted)]">
-                            Upload a .bin file to make it available for OTA
+                            Make firmware available for OTA
                           </p>
                         </div>
-                        <label class="btn flex items-center gap-2 cursor-pointer">
+                        <label class="btn btn-ghost flex items-center gap-2 cursor-pointer">
                           {uploadingFirmware ? (
                             <Loader2 class="w-4 h-4 animate-spin" />
                           ) : (
                             <Upload class="w-4 h-4" />
                           )}
-                          {uploadingFirmware ? 'Uploading...' : 'Choose File'}
+                          {uploadingFirmware ? 'Uploading...' : 'Choose'}
                           <input
                             type="file"
                             accept=".bin"
@@ -1547,7 +1601,7 @@ export function Settings() {
                   </details>
                 </div>
               </div>
-            </div>
+            </SettingsCard>
           </div>
         )}
 
@@ -1555,125 +1609,129 @@ export function Settings() {
 
       {/* Calibration Modal */}
       {calibrationStep !== 'idle' && (
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div class="bg-[var(--bg-primary)] rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden border border-[var(--border-color)]">
+        <div class="modal-overlay">
+          <div class="modal max-w-md">
             {/* Header */}
-            <div class="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)]">
+            <div class="modal-header">
               <div class="flex items-center gap-3">
-                <Scale class="w-5 h-5 text-[var(--accent)]" />
-                <h2 class="text-lg font-medium text-[var(--text-primary)]">
-                  {calibrationStep === 'complete' ? 'Calibration Complete' : `Scale Calibration (${calibrationStep === 'empty' ? '1' : '2'}/2)`}
-                </h2>
+                <div class="w-9 h-9 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center">
+                  <Scale class="w-5 h-5 text-[var(--accent)]" />
+                </div>
+                <div>
+                  <h2 class="modal-title">
+                    {calibrationStep === 'complete' ? 'Calibration Complete' : 'Scale Calibration'}
+                  </h2>
+                  {calibrationStep !== 'complete' && (
+                    <p class="text-xs text-[var(--text-muted)]">Step {calibrationStep === 'empty' ? '1' : '2'} of 2</p>
+                  )}
+                </div>
               </div>
-              <button onClick={cancelCalibration} class="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+              <button onClick={cancelCalibration} class="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors">
                 <X class="w-5 h-5" />
               </button>
             </div>
 
             {/* Content */}
-            <div class="p-6">
+            <div class="modal-body">
               {calibrationStep === 'empty' && (
-                <div class="space-y-6">
-                  <div class="flex items-start gap-4">
-                    <div class="w-12 h-12 rounded-full bg-[var(--accent)]/10 flex items-center justify-center flex-shrink-0">
-                      <Scale class="w-6 h-6 text-[var(--accent)]" />
-                    </div>
-                    <div>
-                      <h3 class="text-sm font-medium text-[var(--text-primary)]">Remove everything from the scale</h3>
-                      <p class="mt-1 text-sm text-[var(--text-secondary)]">
-                        Make sure the scale is empty and stable before continuing.
-                      </p>
-                    </div>
+                <div class="space-y-5">
+                  <div class="p-4 bg-[var(--accent)]/5 border border-[var(--accent)]/20 rounded-xl">
+                    <h3 class="text-sm font-semibold text-[var(--text-primary)] mb-1">Remove everything from the scale</h3>
+                    <p class="text-xs text-[var(--text-muted)]">
+                      Ensure scale is empty and stable before continuing
+                    </p>
                   </div>
 
-                  <div class="p-4 bg-[var(--bg-secondary)] rounded-lg">
-                    <p class="text-xs text-[var(--text-muted)] mb-1">Current reading</p>
-                    <p class="text-3xl font-mono text-[var(--text-primary)]">
-                      {currentWeight !== null ? `${Math.round(currentWeight)}g` : "--"}
+                  <div class="p-5 bg-[var(--bg-tertiary)]/50 rounded-xl border border-[var(--border-color)] text-center">
+                    <p class="text-xs text-[var(--text-muted)] mb-2">Current reading</p>
+                    <p class="text-4xl font-mono font-bold text-[var(--text-primary)]">
+                      {currentWeight !== null ? `${Math.round(currentWeight)}g` : "—"}
                     </p>
                   </div>
                 </div>
               )}
 
               {calibrationStep === 'weight' && (
-                <div class="space-y-6">
-                  <div class="flex items-start gap-4">
-                    <div class="w-12 h-12 rounded-full bg-[var(--accent)]/10 flex items-center justify-center flex-shrink-0">
-                      <Scale class="w-6 h-6 text-[var(--accent)]" />
-                    </div>
-                    <div>
-                      <h3 class="text-sm font-medium text-[var(--text-primary)]">Place calibration weight on scale</h3>
-                      <p class="mt-1 text-sm text-[var(--text-secondary)]">
-                        Place a known weight on the scale and enter its exact value below.
-                      </p>
-                    </div>
+                <div class="space-y-5">
+                  <div class="p-4 bg-[var(--accent)]/5 border border-[var(--accent)]/20 rounded-xl">
+                    <h3 class="text-sm font-semibold text-[var(--text-primary)] mb-1">Place calibration weight</h3>
+                    <p class="text-xs text-[var(--text-muted)]">
+                      Add a known weight and enter the exact value below
+                    </p>
                   </div>
 
-                  <div class="space-y-4">
-                    <div>
-                      <label class="block text-xs text-[var(--text-muted)] mb-1">Known weight (grams)</label>
-                      <input
-                        type="number"
-                        min="10"
-                        max="5000"
-                        step="1"
-                        value={calibrationWeight}
-                        onInput={(e) => {
-                          const val = parseInt((e.target as HTMLInputElement).value);
-                          if (!isNaN(val) && val >= 1 && val <= 9999) {
-                            setCalibrationWeight(val);
-                          }
-                        }}
-                        class="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] text-lg font-mono focus:border-[var(--accent)] focus:outline-none"
-                      />
-                    </div>
+                  <div>
+                    <label class="label">Known Weight (grams)</label>
+                    <input
+                      type="number"
+                      min="10"
+                      max="5000"
+                      step="1"
+                      value={calibrationWeight}
+                      onInput={(e) => {
+                        const val = parseInt((e.target as HTMLInputElement).value);
+                        if (!isNaN(val) && val >= 1 && val <= 9999) {
+                          setCalibrationWeight(val);
+                        }
+                      }}
+                      class="input text-lg font-mono text-center"
+                    />
+                  </div>
 
-                    <div class="p-4 bg-[var(--bg-secondary)] rounded-lg">
-                      <div class="flex justify-between mb-2">
-                        <span class="text-xs text-[var(--text-muted)]">Current reading</span>
-                        <span class="text-xs text-[var(--text-muted)]">Target</span>
-                      </div>
-                      <div class="flex justify-between items-baseline">
-                        <span class="text-2xl font-mono text-[var(--text-primary)]">
-                          {currentWeight !== null ? `${Math.round(currentWeight)}g` : "--"}
+                  <div class="p-4 bg-[var(--bg-tertiary)]/50 rounded-xl border border-[var(--border-color)]">
+                    <div class="flex justify-between items-center mb-4">
+                      <div class="text-center">
+                        <p class="text-xs text-[var(--text-muted)] mb-1">Current</p>
+                        <span class="text-2xl font-mono font-bold text-[var(--text-primary)]">
+                          {currentWeight !== null ? `${Math.round(currentWeight)}g` : "—"}
                         </span>
-                        <span class="text-2xl font-mono text-[var(--accent)]">
+                      </div>
+                      <div class="text-[var(--text-muted)]">→</div>
+                      <div class="text-center">
+                        <p class="text-xs text-[var(--text-muted)] mb-1">Target</p>
+                        <span class="text-2xl font-mono font-bold text-[var(--accent)]">
                           {calibrationWeight}g
                         </span>
                       </div>
-                      {currentWeight !== null && (
-                        <p class={`text-xs mt-2 ${Math.abs(currentWeight - calibrationWeight) < 10 ? 'text-green-500' : 'text-yellow-500'}`}>
-                          Difference: {Math.round(currentWeight - calibrationWeight)}g
-                        </p>
-                      )}
-                      <div class={`mt-3 flex items-center gap-2 text-xs ${weightStable ? 'text-green-500' : 'text-yellow-500'}`}>
-                        <div class={`w-2 h-2 rounded-full ${weightStable ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
-                        {weightStable ? 'Stabilized' : 'Waiting for weight to stabilize...'}
+                    </div>
+                    {currentWeight !== null && (
+                      <div class={`text-center py-2 rounded-lg ${
+                        Math.abs(currentWeight - calibrationWeight) < 10
+                          ? 'bg-green-500/10 text-green-500'
+                          : 'bg-yellow-500/10 text-yellow-500'
+                      }`}>
+                        <span class="text-sm font-medium">
+                          {Math.abs(currentWeight - calibrationWeight) < 10
+                            ? 'Readings close - ready to calibrate'
+                            : `Difference: ${Math.round(currentWeight - calibrationWeight)}g`}
+                        </span>
                       </div>
+                    )}
+                    <div class={`mt-3 flex items-center justify-center gap-2 text-xs ${weightStable ? 'text-green-500' : 'text-yellow-500'}`}>
+                      <div class={`w-2 h-2 rounded-full ${weightStable ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
+                      {weightStable ? 'Weight stabilized' : 'Waiting for stability...'}
                     </div>
                   </div>
                 </div>
               )}
 
               {calibrationStep === 'complete' && (
-                <div class="text-center space-y-4">
-                  <div class="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto">
-                    <CheckCircle class="w-8 h-8 text-green-500" />
+                <div class="text-center py-6">
+                  <div class="w-20 h-20 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle class="w-10 h-10 text-green-500" />
                   </div>
-                  <div>
-                    <h3 class="text-lg font-medium text-[var(--text-primary)]">Calibration complete!</h3>
-                    <p class="mt-1 text-sm text-[var(--text-secondary)]">
-                      Your scale is now calibrated and ready to use.
-                    </p>
-                  </div>
+                  <h3 class="text-lg font-semibold text-[var(--text-primary)]">Calibration Complete!</h3>
+                  <p class="mt-2 text-sm text-[var(--text-muted)]">
+                    Your scale is now calibrated and ready to use.
+                  </p>
                 </div>
               )}
             </div>
 
             {/* Footer */}
-            <div class="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border-color)]">
+            <div class="modal-footer">
               {calibrationStep !== 'complete' && (
-                <button onClick={cancelCalibration} class="btn">
+                <button onClick={cancelCalibration} class="btn btn-ghost">
                   Cancel
                 </button>
               )}
@@ -1694,7 +1752,7 @@ export function Settings() {
                   </>
                 ) : calibrationStep === 'empty' ? (
                   <>
-                    Tare & Next
+                    Tare & Continue
                     <ChevronRight class="w-4 h-4" />
                   </>
                 ) : calibrationStep === 'weight' ? (
