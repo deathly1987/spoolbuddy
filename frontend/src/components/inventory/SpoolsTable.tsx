@@ -15,8 +15,9 @@ import { Spool, SpoolsInPrinters } from '../../lib/api'
 import { SpoolCard } from './SpoolCard'
 import { WeightProgress } from './ProgressBar'
 import { PrinterBadge, KBadge, OriginBadge } from './Badge'
+import { EmptyState } from './EmptyState'
 import { getNetWeight, getGrossWeight, compareWeights, formatWeight, getFilamentName } from './utils'
-import { ChevronUp, ChevronDown, Search, Check, AlertTriangle, Columns, RefreshCw } from 'lucide-preact'
+import { ChevronUp, ChevronDown, Search, Check, AlertTriangle, Columns, RefreshCw, X, Archive, Clock, Package } from 'lucide-preact'
 import { ColumnConfig } from './ColumnConfigModal'
 
 const columnHelper = createColumnHelper<Spool>()
@@ -97,6 +98,7 @@ interface SpoolsTableProps {
   onSyncWeight?: (spool: Spool) => void
   columnConfig?: ColumnConfig[]
   onOpenColumns?: () => void
+  onAddSpool?: () => void
 }
 
 export function SpoolsTable({
@@ -105,7 +107,8 @@ export function SpoolsTable({
   onEditSpool,
   onSyncWeight,
   columnConfig,
-  onOpenColumns
+  onOpenColumns,
+  onAddSpool,
 }: SpoolsTableProps) {
   const [sorting, setSorting] = useState<SortingState>(getStoredSorting)
   const [globalFilter, setGlobalFilter] = useState('')
@@ -522,115 +525,184 @@ export function SpoolsTable({
     getPaginationRowModel: getPaginationRowModel(),
   })
 
+  // Check if any filters are active
+  const hasActiveFilters = archiveFilter !== 'active' ||
+    usageFilter !== 'all' ||
+    getFilterValue('material') ||
+    getFilterValue('brand') ||
+    getFilterValue('location') ||
+    globalFilter
+
+  const clearAllFilters = () => {
+    setArchiveFilter('active')
+    setUsageFilter('all')
+    setColumnFilters([])
+    setGlobalFilter('')
+  }
+
   return (
     <div class="space-y-4">
       {/* Toolbar */}
-      <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div class="flex items-center gap-2">
-          <button
-            onClick={onOpenColumns}
-            class="btn"
-            title="Configure Columns"
-          >
-            <Columns class="w-4 h-4" />
-            <span>Columns</span>
-          </button>
-          <select
-            value={archiveFilter}
-            onChange={(e) => setArchiveFilter((e.target as HTMLSelectElement).value as ArchiveFilter)}
-            class="select"
-            title="Filter by status"
-          >
-            <option value="active">Active</option>
-            <option value="archived">Archived</option>
-            <option value="all">All</option>
-          </select>
-          <select
-            value={usageFilter}
-            onChange={(e) => setUsageFilter((e.target as HTMLSelectElement).value as UsageFilter)}
-            class="select"
-            title="Filter by usage"
-          >
-            <option value="all">All spools</option>
-            <option value="used">Used only</option>
-            <option value="unused">Unused only</option>
-          </select>
-          <select
-            value={getFilterValue('material')}
-            onChange={(e) => setFilterValue('material', (e.target as HTMLSelectElement).value)}
-            class="select"
-            title="Filter by material"
-          >
-            <option value="">All materials</option>
-            {uniqueMaterials.map(m => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
-          <select
-            value={getFilterValue('brand')}
-            onChange={(e) => setFilterValue('brand', (e.target as HTMLSelectElement).value)}
-            class="select"
-            title="Filter by brand"
-          >
-            <option value="">All brands</option>
-            {uniqueBrands.map(b => (
-              <option key={b} value={b}>{b}</option>
-            ))}
-          </select>
-          {uniqueLocations.length > 0 && (
-            <select
-              value={getFilterValue('location')}
-              onChange={(e) => setFilterValue('location', (e.target as HTMLSelectElement).value)}
-              class="select"
-              title="Filter by location"
-            >
-              <option value="">All locations</option>
-              {uniqueLocations.map(l => (
-                <option key={l} value={l}>{l}</option>
-              ))}
-            </select>
-          )}
-          <div class="relative">
-            <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
+      <div class="flex flex-col gap-3">
+        {/* Top row: Search, View toggle, Columns */}
+        <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+          <div class="relative flex-1 max-w-md">
+            <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
             <input
               type="text"
               value={globalFilter}
               onInput={(e) => setGlobalFilter((e.target as HTMLInputElement).value)}
               placeholder="Search spools..."
-              class="input input-with-icon"
-              style={{ width: '500px' }}
+              class="input input-with-icon w-full"
             />
+            {globalFilter && (
+              <button
+                onClick={() => setGlobalFilter('')}
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              >
+                <X class="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button
+              onClick={onOpenColumns}
+              class="btn"
+              title="Configure Columns"
+            >
+              <Columns class="w-4 h-4" />
+              <span class="hidden sm:inline">Columns</span>
+            </button>
+            <div class="flex bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg overflow-hidden">
+              <button
+                onClick={() => setViewMode('table')}
+                class={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                  viewMode === 'table'
+                    ? 'bg-[var(--accent-color)] text-white'
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                }`}
+              >
+                Table
+              </button>
+              <button
+                onClick={() => setViewMode('cards')}
+                class={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                  viewMode === 'cards'
+                    ? 'bg-[var(--accent-color)] text-white'
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                }`}
+              >
+                Cards
+              </button>
+            </div>
           </div>
         </div>
 
-        <div class="flex items-center gap-1">
-          <div class="flex bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg overflow-hidden">
+        {/* Filter chips row */}
+        <div class="flex flex-wrap items-center gap-2">
+          {/* Status chips */}
+          <div class="flex items-center rounded-lg border border-[var(--border-color)] overflow-hidden">
             <button
-              onClick={() => setViewMode('table')}
-              class={`px-4 py-2 text-sm font-medium transition-colors ${
-                viewMode === 'table'
-                  ? 'bg-[var(--accent-color)] text-white'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
-              }`}
+              onClick={() => setArchiveFilter('active')}
+              class={`filter-chip ${archiveFilter === 'active' ? 'filter-chip-active' : ''}`}
             >
-              Table
+              <Package class="w-3.5 h-3.5" />
+              Active
             </button>
             <button
-              onClick={() => setViewMode('cards')}
-              class={`px-4 py-2 text-sm font-medium transition-colors ${
-                viewMode === 'cards'
-                  ? 'bg-[var(--accent-color)] text-white'
-                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
-              }`}
+              onClick={() => setArchiveFilter('archived')}
+              class={`filter-chip ${archiveFilter === 'archived' ? 'filter-chip-active' : ''}`}
             >
-              Cards
+              <Archive class="w-3.5 h-3.5" />
+              Archived
             </button>
           </div>
-        </div>
-      </div>
 
-      <div class="text-xs text-[var(--text-muted)]">
-        Click row to view details
+          <div class="w-px h-5 bg-[var(--border-color)]" />
+
+          {/* Usage chips */}
+          <div class="flex items-center rounded-lg border border-[var(--border-color)] overflow-hidden">
+            <button
+              onClick={() => setUsageFilter('all')}
+              class={`filter-chip ${usageFilter === 'all' ? 'filter-chip-active' : ''}`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setUsageFilter('used')}
+              class={`filter-chip ${usageFilter === 'used' ? 'filter-chip-active' : ''}`}
+            >
+              <Clock class="w-3.5 h-3.5" />
+              Used
+            </button>
+            <button
+              onClick={() => setUsageFilter('unused')}
+              class={`filter-chip ${usageFilter === 'unused' ? 'filter-chip-active' : ''}`}
+            >
+              New
+            </button>
+          </div>
+
+          <div class="w-px h-5 bg-[var(--border-color)]" />
+
+          {/* Material dropdown as chip */}
+          <select
+            value={getFilterValue('material')}
+            onChange={(e) => setFilterValue('material', (e.target as HTMLSelectElement).value)}
+            class={`filter-chip-select ${getFilterValue('material') ? 'filter-chip-select-active' : ''}`}
+          >
+            <option value="">Material</option>
+            {uniqueMaterials.map(m => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+
+          {/* Brand dropdown as chip */}
+          <select
+            value={getFilterValue('brand')}
+            onChange={(e) => setFilterValue('brand', (e.target as HTMLSelectElement).value)}
+            class={`filter-chip-select ${getFilterValue('brand') ? 'filter-chip-select-active' : ''}`}
+          >
+            <option value="">Brand</option>
+            {uniqueBrands.map(b => (
+              <option key={b} value={b}>{b}</option>
+            ))}
+          </select>
+
+          {/* Location dropdown as chip */}
+          {uniqueLocations.length > 0 && (
+            <select
+              value={getFilterValue('location')}
+              onChange={(e) => setFilterValue('location', (e.target as HTMLSelectElement).value)}
+              class={`filter-chip-select ${getFilterValue('location') ? 'filter-chip-select-active' : ''}`}
+            >
+              <option value="">Location</option>
+              {uniqueLocations.map(l => (
+                <option key={l} value={l}>{l}</option>
+              ))}
+            </select>
+          )}
+
+          {/* Clear all filters button */}
+          {hasActiveFilters && (
+            <>
+              <div class="w-px h-5 bg-[var(--border-color)]" />
+              <button
+                onClick={clearAllFilters}
+                class="text-xs text-[var(--text-muted)] hover:text-[var(--accent-color)] transition-colors flex items-center gap-1"
+              >
+                <X class="w-3.5 h-3.5" />
+                Clear filters
+              </button>
+            </>
+          )}
+
+          {/* Results count */}
+          <span class="ml-auto text-xs text-[var(--text-muted)]">
+            {table.getFilteredRowModel().rows.length} spool{table.getFilteredRowModel().rows.length !== 1 ? 's' : ''}
+          </span>
+        </div>
       </div>
 
       {/* Content */}
@@ -646,12 +718,17 @@ export function SpoolsTable({
             />
           ))}
           {table.getRowModel().rows.length === 0 && (
-            <div class="col-span-full text-center py-12 text-[var(--text-muted)]">
-              {globalFilter ? 'No spools match your search' :
-               archiveFilter === 'archived' ? 'No archived spools' :
-               usageFilter === 'used' ? 'No used spools' :
-               usageFilter === 'unused' ? 'No unused spools' :
-               'No spools in inventory'}
+            <div class="col-span-full">
+              <EmptyState
+                type={
+                  globalFilter ? 'no-search-results' :
+                  archiveFilter === 'archived' ? 'no-archived' :
+                  usageFilter === 'used' ? 'no-used' :
+                  usageFilter === 'unused' ? 'no-unused' :
+                  'no-spools'
+                }
+                onAddSpool={onAddSpool}
+              />
             </div>
           )}
         </div>
@@ -694,12 +771,17 @@ export function SpoolsTable({
                   ))}
                   {table.getRowModel().rows.length === 0 && (
                     <tr>
-                      <td colSpan={columns.length} class="text-center py-12 text-[var(--text-muted)]">
-                        {globalFilter ? 'No spools match your search' :
-                         archiveFilter === 'archived' ? 'No archived spools' :
-                         usageFilter === 'used' ? 'No used spools' :
-                         usageFilter === 'unused' ? 'No unused spools' :
-                         'No spools in inventory'}
+                      <td colSpan={columns.length}>
+                        <EmptyState
+                          type={
+                            globalFilter ? 'no-search-results' :
+                            archiveFilter === 'archived' ? 'no-archived' :
+                            usageFilter === 'used' ? 'no-used' :
+                            usageFilter === 'unused' ? 'no-unused' :
+                            'no-spools'
+                          }
+                          onAddSpool={onAddSpool}
+                        />
                       </td>
                     </tr>
                   )}

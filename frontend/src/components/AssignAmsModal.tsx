@@ -32,25 +32,15 @@ function isDualNozzle(state: PrinterState | undefined): boolean {
   if (!state) return false;
 
   // Primary check: nozzle_count from backend (most reliable)
-  if (state.nozzle_count === 2) {
-    console.log('[isDualNozzle] Detected via nozzle_count=2');
-    return true;
-  }
+  if (state.nozzle_count === 2) return true;
 
   // Fallback: check if tray_now_left is set (only dual-nozzle has left nozzle)
-  if (typeof state.tray_now_left === 'number') {
-    console.log('[isDualNozzle] Detected via tray_now_left:', state.tray_now_left);
-    return true;
-  }
+  if (typeof state.tray_now_left === 'number') return true;
 
   // Fallback: check if multiple AMS units have extruder assignments
   const unitsWithExtruder = state.ams_units?.filter(u => typeof u.extruder === 'number') || [];
-  if (unitsWithExtruder.length >= 2) {
-    console.log('[isDualNozzle] Detected via unitsWithExtruder:', unitsWithExtruder.length);
-    return true;
-  }
+  if (unitsWithExtruder.length >= 2) return true;
 
-  console.log('[isDualNozzle] Not dual-nozzle. nozzle_count:', state.nozzle_count, 'tray_now_left:', state.tray_now_left, 'unitsWithExtruder:', unitsWithExtruder.length);
   return false;
 }
 

@@ -252,6 +252,7 @@ export function Inventory() {
           onEditSpool={(spool) => setEditSpool(spool)}
           onSyncWeight={handleSyncWeight}
           onOpenColumns={() => setShowColumnModal(true)}
+          onAddSpool={() => setShowAddModal(true)}
         />
       )}
 
