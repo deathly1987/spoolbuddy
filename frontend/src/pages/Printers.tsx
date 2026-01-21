@@ -15,9 +15,9 @@ import {
   WifiOff,
   Loader2,
   Info,
-  Image,
   RefreshCw,
   Frown,
+  Box,
 } from "lucide-preact";
 
 const EXPANDED_PRINTERS_KEY = "spoolbuddy-expanded-printers";
@@ -117,6 +117,62 @@ function getModelImage(model: string | null): string {
   if (modelLower.includes('a1')) return '/img/printers/a1.png';
 
   return '/img/printers/default.png';
+}
+
+// Cover image component for print jobs
+function CoverImage({ url, printName }: { url: string | null; printName?: string | null }) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+  const [showOverlay, setShowOverlay] = useState(false);
+
+  // Reset state when URL changes
+  useEffect(() => {
+    setLoaded(false);
+    setError(false);
+  }, [url]);
+
+  return (
+    <>
+      <div
+        class={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden bg-[var(--bg-tertiary)] flex items-center justify-center ${url && loaded ? 'cursor-pointer' : ''}`}
+        onClick={() => url && loaded && setShowOverlay(true)}
+      >
+        {url && !error ? (
+          <>
+            <img
+              src={url}
+              alt="Print preview"
+              class={`w-full h-full object-cover ${loaded ? 'block' : 'hidden'}`}
+              onLoad={() => setLoaded(true)}
+              onError={() => setError(true)}
+            />
+            {!loaded && <Box class="w-8 h-8 text-[var(--text-muted)]" />}
+          </>
+        ) : (
+          <Box class="w-8 h-8 text-[var(--text-muted)]" />
+        )}
+      </div>
+
+      {/* Cover Image Overlay */}
+      {showOverlay && url && (
+        <div
+          class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-8"
+          onClick={() => setShowOverlay(false)}
+        >
+          <div class="max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={url}
+              alt="Print preview"
+              class="w-full rounded-lg"
+            />
+            {printName && (
+              <p class="mt-3 text-center text-white text-sm">{printName}</p>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 export function Printers() {
@@ -529,10 +585,11 @@ export function Printers() {
                       {connected && state && state.gcode_state && state.gcode_state !== "IDLE" && (
                         <div class="mt-3 pt-3 border-t border-[var(--border-color)]">
                           <div class="flex gap-4">
-                            {/* Thumbnail placeholder */}
-                            <div class="flex-shrink-0 w-16 h-16 bg-[var(--bg-tertiary)] rounded-lg flex items-center justify-center">
-                              <Image class="w-8 h-8 text-[var(--text-muted)]" strokeWidth={1.5} />
-                            </div>
+                            {/* Cover image */}
+                            <CoverImage
+                              url={state.gcode_state === "RUNNING" || state.gcode_state === "PAUSE" ? `/api/printers/${printer.serial}/cover?format=png` : null}
+                              printName={state.subtask_name}
+                            />
 
                             {/* Print info */}
                             <div class="flex-1 min-w-0">

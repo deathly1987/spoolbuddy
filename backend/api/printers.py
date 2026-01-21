@@ -718,11 +718,15 @@ async def get_calibrations(serial: str, nozzle_diameter: str = "0.4"):
 
 
 @router.get("/{serial}/cover")
-async def get_printer_cover(serial: str):
+async def get_printer_cover(serial: str, format: str = "rgb565"):
     """Get the cover image for the current print job.
 
     Downloads the 3MF file from the printer via FTP and extracts the thumbnail.
     Results are cached per print job.
+
+    Args:
+        serial: Printer serial number
+        format: Output format - 'png' for web display, 'rgb565' for ESP32 display (default)
     """
     db = await get_db()
     printer = await db.get_printer(serial)
@@ -752,10 +756,11 @@ async def get_printer_cover(serial: str):
         if match:
             plate_num = int(match.group(1))
 
-    # Check cache
-    cache_key = (subtask_name, plate_num)
+    # Check cache (include format in key)
+    cache_key = (subtask_name, plate_num, format)
     if serial in _cover_cache and cache_key in _cover_cache[serial]:
-        return Response(content=_cover_cache[serial][cache_key], media_type="application/octet-stream")
+        media_type = "image/png" if format == "png" else "application/octet-stream"
+        return Response(content=_cover_cache[serial][cache_key], media_type=media_type)
 
     # Build 3MF filename
     filename = subtask_name
@@ -806,14 +811,21 @@ async def get_printer_cover(serial: str):
         for thumb_path in thumbnail_paths:
             try:
                 image_data = zf.read(thumb_path)
-                # Convert to raw RGB565 for ESP32 display
-                rgb565_data = resize_cover_image(image_data)
-                logger.info(f"Converted cover to RGB565: {len(rgb565_data)} bytes")
-                # Cache result
-                if serial not in _cover_cache:
-                    _cover_cache[serial] = {}
-                _cover_cache[serial][cache_key] = rgb565_data
-                return Response(content=rgb565_data, media_type="application/octet-stream")
+                if format == "png":
+                    # Return PNG directly for web display
+                    logger.info(f"Returning cover as PNG: {len(image_data)} bytes")
+                    if serial not in _cover_cache:
+                        _cover_cache[serial] = {}
+                    _cover_cache[serial][cache_key] = image_data
+                    return Response(content=image_data, media_type="image/png")
+                else:
+                    # Convert to raw RGB565 for ESP32 display
+                    rgb565_data = resize_cover_image(image_data)
+                    logger.info(f"Converted cover to RGB565: {len(rgb565_data)} bytes")
+                    if serial not in _cover_cache:
+                        _cover_cache[serial] = {}
+                    _cover_cache[serial][cache_key] = rgb565_data
+                    return Response(content=rgb565_data, media_type="application/octet-stream")
             except KeyError:
                 continue
 
@@ -821,13 +833,21 @@ async def get_printer_cover(serial: str):
         for name in zf.namelist():
             if name.startswith("Metadata/") and name.endswith(".png"):
                 image_data = zf.read(name)
-                # Convert to raw RGB565 for ESP32 display
-                rgb565_data = resize_cover_image(image_data)
-                logger.info(f"Converted cover to RGB565: {len(rgb565_data)} bytes")
-                if serial not in _cover_cache:
-                    _cover_cache[serial] = {}
-                _cover_cache[serial][cache_key] = rgb565_data
-                return Response(content=rgb565_data, media_type="application/octet-stream")
+                if format == "png":
+                    # Return PNG directly for web display
+                    logger.info(f"Returning cover as PNG: {len(image_data)} bytes")
+                    if serial not in _cover_cache:
+                        _cover_cache[serial] = {}
+                    _cover_cache[serial][cache_key] = image_data
+                    return Response(content=image_data, media_type="image/png")
+                else:
+                    # Convert to raw RGB565 for ESP32 display
+                    rgb565_data = resize_cover_image(image_data)
+                    logger.info(f"Converted cover to RGB565: {len(rgb565_data)} bytes")
+                    if serial not in _cover_cache:
+                        _cover_cache[serial] = {}
+                    _cover_cache[serial][cache_key] = rgb565_data
+                    return Response(content=rgb565_data, media_type="application/octet-stream")
 
         raise HTTPException(status_code=404, detail="No thumbnail found in 3MF file")
     finally:
