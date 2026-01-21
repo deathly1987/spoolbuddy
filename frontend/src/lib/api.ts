@@ -296,6 +296,57 @@ export interface AMSThresholds {
   history_retention_days: number;
 }
 
+// Support API types
+export interface DebugLoggingState {
+  enabled: boolean;
+  enabled_at: string | null;
+  duration_seconds: number | null;
+}
+
+export interface LogEntry {
+  timestamp: string;
+  level: string;
+  logger_name: string;
+  message: string;
+}
+
+export interface LogsResponse {
+  entries: LogEntry[];
+  total_count: number;
+  filtered_count: number;
+}
+
+export interface SystemInfo {
+  // Application
+  version: string;
+  uptime: string;
+  uptime_seconds: number;
+  hostname: string;
+  // Database stats
+  spool_count: number;
+  printer_count: number;
+  connected_printers: number;
+  // Storage
+  database_size: string;
+  disk_total: string;
+  disk_used: string;
+  disk_free: string;
+  disk_percent: number;
+  // System
+  platform: string;
+  platform_release: string;
+  python_version: string;
+  boot_time: string;
+  // Memory
+  memory_total: string;
+  memory_used: string;
+  memory_available: string;
+  memory_percent: number;
+  // CPU
+  cpu_count: number;
+  cpu_percent: number;
+}
+
 class ApiClient {
   private async request<T>(
     path: string,
@@ -758,6 +809,46 @@ class ApiClient {
       method: "PUT",
       body: JSON.stringify(thresholds),
     });
+  }
+
+  // Support API
+  async getDebugLogging(): Promise<DebugLoggingState> {
+    return this.request<DebugLoggingState>("/support/debug-logging");
+  }
+
+  async setDebugLogging(enabled: boolean): Promise<DebugLoggingState> {
+    return this.request<DebugLoggingState>("/support/debug-logging", {
+      method: "POST",
+      body: JSON.stringify({ enabled }),
+    });
+  }
+
+  async getLogs(params?: { limit?: number; level?: string; search?: string }): Promise<LogsResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.limit) searchParams.set("limit", String(params.limit));
+    if (params?.level) searchParams.set("level", params.level);
+    if (params?.search) searchParams.set("search", params.search);
+    const query = searchParams.toString();
+    return this.request<LogsResponse>(`/support/logs${query ? `?${query}` : ""}`);
+  }
+
+  async clearLogs(): Promise<{ message: string }> {
+    return this.request<{ message: string }>("/support/logs", {
+      method: "DELETE",
+    });
+  }
+
+  async getSystemInfo(): Promise<SystemInfo> {
+    return this.request<SystemInfo>("/support/system-info");
+  }
+
+  async downloadSupportBundle(): Promise<Blob> {
+    const response = await fetch(`${API_BASE}/support/bundle`);
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || `HTTP ${response.status}`);
+    }
+    return response.blob();
   }
 }
 

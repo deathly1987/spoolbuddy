@@ -1,8 +1,10 @@
 import { ComponentChildren } from "preact";
+import { useState, useEffect } from "preact/hooks";
 import { Link, useLocation } from "wouter-preact";
 import { useWebSocket } from "../lib/websocket";
 import { useTheme } from "../lib/theme";
-import { Sun, Moon, Github } from "lucide-preact";
+import { Sun, Moon, Github, Bug } from "lucide-preact";
+import { api, DebugLoggingState } from "../lib/api";
 
 interface LayoutProps {
   children: ComponentChildren;
@@ -19,9 +21,46 @@ export function Layout({ children }: LayoutProps) {
   const [location] = useLocation();
   const { deviceConnected } = useWebSocket();
   const { theme, toggleTheme } = useTheme();
+  const [debugLogging, setDebugLogging] = useState<DebugLoggingState | null>(null);
+
+  // Fetch debug logging state and poll for updates
+  useEffect(() => {
+    const fetchDebugState = async () => {
+      try {
+        const state = await api.getDebugLogging();
+        setDebugLogging(state);
+      } catch (e) {
+        // Silently fail - debug banner just won't show
+      }
+    };
+
+    fetchDebugState();
+    const interval = setInterval(fetchDebugState, 10000); // Poll every 10 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div class="min-h-screen flex flex-col bg-[var(--bg-secondary)]">
+      {/* Debug Logging Banner - shown on all pages when enabled */}
+      {debugLogging?.enabled && (
+        <div class="bg-amber-500/90 text-black px-4 py-2">
+          <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <Bug class="w-5 h-5" />
+              <span class="font-medium">Debug Logging Active</span>
+              {debugLogging.duration_seconds !== null && (
+                <span class="text-amber-900">
+                  ({Math.floor(debugLogging.duration_seconds / 60)}m {debugLogging.duration_seconds % 60}s)
+                </span>
+              )}
+            </div>
+            <Link href="/settings#debug" class="text-sm font-medium hover:underline">
+              Manage →
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header class="bg-[var(--bg-header)] text-[var(--header-text)] shadow-md border-b border-[var(--border-color)]">
         <div class="w-full px-4 sm:px-6 lg:px-8">

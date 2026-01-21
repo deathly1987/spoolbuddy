@@ -15,12 +15,14 @@ from api import (
     printers_router,
     serial_router,
     spools_router,
+    support_router,
     tags_router,
     updates_router,
 )
 from api.cloud import router as cloud_router
 from api.printers import set_printer_manager
 from api.settings import router as settings_router
+from api.support import init_debug_logging
 from config import settings
 from db import get_db
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -33,8 +35,26 @@ from usage_tracker import UsageTracker, estimate_weight_from_percent
 from zeroconf import ServiceInfo
 from zeroconf.asyncio import AsyncZeroconf
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+# Configure logging with both console and file output
+LOG_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
+LOG_FILE = "spoolbuddy.log"
+
+# Set up root logger
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+
+# Console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+root_logger.addHandler(console_handler)
+
+# File handler
+file_handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+root_logger.addHandler(file_handler)
+
 logger = logging.getLogger(__name__)
 
 # === Bambu Color Name Lookup ===
@@ -630,6 +650,9 @@ async def lifespan(app: FastAPI):
     await get_db()
     logger.info("Database initialized")
 
+    # Initialize debug logging from settings
+    init_debug_logging()
+
     # Set up usage tracker
     usage_tracker.set_usage_callback(on_usage_logged)
     usage_tracker.set_event_loop(asyncio.get_running_loop())
@@ -715,6 +738,7 @@ app.include_router(serial_router, prefix="/api")
 app.include_router(discovery_router, prefix="/api")
 app.include_router(catalog_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
+app.include_router(support_router, prefix="/api")
 
 
 @app.get("/api/time")

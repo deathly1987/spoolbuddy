@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "preact/hooks";
 import * as preact from "preact";
 import { useWebSocket } from "../lib/websocket";
-import { api, CloudAuthStatus, VersionInfo, UpdateCheck, UpdateStatus, FirmwareCheck, AMSThresholds } from "../lib/api";
-import { Cloud, CloudOff, LogOut, Loader2, Mail, Lock, Key, Download, RefreshCw, CheckCircle, AlertCircle, GitBranch, ExternalLink, Wifi, WifiOff, Cpu, Usb, RotateCcw, Upload, HardDrive, Palette, Sun, Moon, LayoutDashboard, Settings2, Package, Monitor, Scale, X, ChevronRight, Droplets, Thermometer } from "lucide-preact";
+import { api, CloudAuthStatus, VersionInfo, UpdateCheck, UpdateStatus, FirmwareCheck, AMSThresholds, DebugLoggingState, LogEntry, SystemInfo } from "../lib/api";
+import { Cloud, CloudOff, LogOut, Loader2, Mail, Lock, Key, Download, RefreshCw, CheckCircle, AlertCircle, GitBranch, ExternalLink, Wifi, WifiOff, Cpu, Usb, RotateCcw, Upload, HardDrive, Palette, Sun, Moon, LayoutDashboard, Settings2, Package, Monitor, Scale, X, ChevronRight, Droplets, Thermometer, LifeBuoy, Bug, Trash2, FileText, Server, Database, Activity, HelpCircle, Play, Square } from "lucide-preact";
 import { useToast } from "../lib/toast";
 import { SerialTerminal } from "../components/SerialTerminal";
 import { SpoolCatalogSettings } from "../components/SpoolCatalogSettings";
@@ -333,7 +333,7 @@ function AMSSettings() {
   );
 }
 
-type SettingsTab = 'general' | 'filament' | 'system';
+type SettingsTab = 'general' | 'filament' | 'system' | 'support';
 
 // Reusable section card component for consistent styling
 function SettingsCard({
@@ -450,6 +450,20 @@ export function Settings() {
   const [calibrating, setCalibrating] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
+  // Support tab state
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
+  const [loadingSystemInfo, setLoadingSystemInfo] = useState(false);
+  const [debugLogging, setDebugLogging] = useState<DebugLoggingState | null>(null);
+  const [loadingDebug, setLoadingDebug] = useState(false);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [logLevel, setLogLevel] = useState<string>('');
+  const [logSearch, setLogSearch] = useState<string>('');
+  const [logsTotal, setLogsTotal] = useState(0);
+  const [logsFiltered, setLogsFiltered] = useState(0);
+  const [downloadingBundle, setDownloadingBundle] = useState(false);
+  const [logStreaming, setLogStreaming] = useState(false);
+
   // Handle hash navigation and switch to correct tab
   useEffect(() => {
     if (window.location.hash) {
@@ -464,6 +478,9 @@ export function Settings() {
         'about': 'general',
         'dashboard': 'filament',
         'catalog': 'filament',
+        'system-info': 'support',
+        'logs': 'support',
+        'debug': 'support',
       };
       if (sectionToTab[id]) {
         setActiveTab(sectionToTab[id]);
@@ -780,6 +797,132 @@ export function Settings() {
     setCalibrationWeight(500);
   };
 
+  // Load support data when tab becomes active
+  useEffect(() => {
+    if (activeTab !== 'support') return;
+
+    const loadSupportData = async () => {
+      // Load system info
+      setLoadingSystemInfo(true);
+      try {
+        const info = await api.getSystemInfo();
+        setSystemInfo(info);
+      } catch (e) {
+        console.error('Failed to load system info:', e);
+      } finally {
+        setLoadingSystemInfo(false);
+      }
+
+      // Load debug logging state
+      setLoadingDebug(true);
+      try {
+        const state = await api.getDebugLogging();
+        setDebugLogging(state);
+      } catch (e) {
+        console.error('Failed to load debug logging state:', e);
+      } finally {
+        setLoadingDebug(false);
+      }
+    };
+
+    loadSupportData();
+  }, [activeTab]);
+
+  const refreshLogs = async () => {
+    setLoadingLogs(true);
+    try {
+      const response = await api.getLogs({
+        limit: 200,
+        level: logLevel || undefined,
+        search: logSearch || undefined,
+      });
+      setLogs(response.entries);
+      setLogsTotal(response.total_count);
+      setLogsFiltered(response.filtered_count);
+    } catch (e) {
+      console.error('Failed to load logs:', e);
+      showToast('error', 'Failed to load logs');
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  const handleToggleDebugLogging = async () => {
+    if (!debugLogging) return;
+    setLoadingDebug(true);
+    try {
+      const newState = await api.setDebugLogging(!debugLogging.enabled);
+      setDebugLogging(newState);
+      showToast('success', newState.enabled ? 'Debug logging enabled' : 'Debug logging disabled');
+    } catch (e) {
+      showToast('error', 'Failed to toggle debug logging');
+    } finally {
+      setLoadingDebug(false);
+    }
+  };
+
+  const handleClearLogs = async () => {
+    try {
+      await api.clearLogs();
+      setLogs([]);
+      setLogsTotal(0);
+      setLogsFiltered(0);
+      showToast('success', 'Logs cleared');
+    } catch (e) {
+      showToast('error', 'Failed to clear logs');
+    }
+  };
+
+  const handleDownloadBundle = async () => {
+    if (!debugLogging?.enabled) {
+      showToast('error', 'Enable debug logging first to generate support bundle');
+      return;
+    }
+    setDownloadingBundle(true);
+    try {
+      const blob = await api.downloadSupportBundle();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `spoolbuddy-support-${new Date().toISOString().slice(0, 19).replace(/[:-]/g, '')}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('success', 'Support bundle downloaded');
+    } catch (e) {
+      showToast('error', e instanceof Error ? e.message : 'Failed to download support bundle');
+    } finally {
+      setDownloadingBundle(false);
+    }
+  };
+
+  // Refresh logs when filter changes (only if streaming or has logs already)
+  useEffect(() => {
+    if (activeTab === 'support' && (logStreaming || logs.length > 0)) {
+      const timeout = setTimeout(() => {
+        refreshLogs();
+      }, 300);
+      return () => clearTimeout(timeout);
+    }
+  }, [logLevel, logSearch]);
+
+  // Auto-refresh logs when streaming is enabled
+  useEffect(() => {
+    if (!logStreaming || activeTab !== 'support') return;
+    const interval = setInterval(() => {
+      refreshLogs();
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [logStreaming, activeTab]);
+
+  // Stop streaming when leaving support tab
+  useEffect(() => {
+    if (activeTab !== 'support') {
+      setLogStreaming(false);
+    }
+  }, [activeTab]);
+
   const cancelCalibration = () => {
     setCalibrationStep('idle');
     setCalibrating(false);
@@ -828,6 +971,7 @@ export function Settings() {
     { id: 'general', label: 'General', icon: Settings2 },
     { id: 'filament', label: 'Filament', icon: Package },
     { id: 'system', label: 'System', icon: Monitor },
+    { id: 'support', label: 'Support', icon: LifeBuoy },
   ];
 
   return (
@@ -1204,6 +1348,407 @@ export function Settings() {
             <div id="catalog" class="scroll-mt-20">
               <SpoolCatalogSettings />
             </div>
+          </div>
+        )}
+
+        {/* ============ SUPPORT TAB ============ */}
+        {activeTab === 'support' && (
+          <div class="space-y-6">
+            {/* System Information */}
+            <SettingsCard
+              id="system-info"
+              icon={Server}
+              title="System Information"
+              description="Server status and resource usage"
+              headerRight={
+                <button
+                  onClick={async () => {
+                    setLoadingSystemInfo(true);
+                    try {
+                      const info = await api.getSystemInfo();
+                      setSystemInfo(info);
+                    } catch (e) {
+                      showToast('error', 'Failed to refresh system info');
+                    } finally {
+                      setLoadingSystemInfo(false);
+                    }
+                  }}
+                  disabled={loadingSystemInfo}
+                  class="btn btn-ghost flex items-center gap-2"
+                >
+                  {loadingSystemInfo ? (
+                    <Loader2 class="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw class="w-4 h-4" />
+                  )}
+                </button>
+              }
+            >
+              {loadingSystemInfo && !systemInfo ? (
+                <div class="flex items-center justify-center py-8">
+                  <Loader2 class="w-6 h-6 animate-spin text-[var(--accent)]" />
+                </div>
+              ) : systemInfo ? (
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Application Info */}
+                  <div class="space-y-3">
+                    <h4 class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Application</h4>
+                    <div class="space-y-2">
+                      <div class="flex justify-between">
+                        <span class="text-sm text-[var(--text-muted)]">Version</span>
+                        <span class="text-sm font-mono text-[var(--accent)]">v{systemInfo.version}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-sm text-[var(--text-muted)]">Uptime</span>
+                        <span class="text-sm text-[var(--text-primary)]">{systemInfo.uptime}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-sm text-[var(--text-muted)]">Hostname</span>
+                        <span class="text-sm text-[var(--text-primary)]">{systemInfo.hostname}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Database Info */}
+                  <div class="space-y-3">
+                    <h4 class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+                      <Database class="w-3.5 h-3.5" />
+                      Database
+                    </h4>
+                    <div class="space-y-2">
+                      <div class="flex justify-between">
+                        <span class="text-sm text-[var(--text-muted)]">Spools</span>
+                        <span class="text-sm text-[var(--text-primary)]">{systemInfo.spool_count}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-sm text-[var(--text-muted)]">Printers</span>
+                        <span class="text-sm text-[var(--text-primary)]">{systemInfo.printer_count} ({systemInfo.connected_printers} connected)</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-sm text-[var(--text-muted)]">Size</span>
+                        <span class="text-sm text-[var(--text-primary)]">{systemInfo.database_size}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* System Info */}
+                  <div class="space-y-3">
+                    <h4 class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+                      <Monitor class="w-3.5 h-3.5" />
+                      System
+                    </h4>
+                    <div class="space-y-2">
+                      <div class="flex justify-between">
+                        <span class="text-sm text-[var(--text-muted)]">Platform</span>
+                        <span class="text-sm text-[var(--text-primary)]">{systemInfo.platform} {systemInfo.platform_release}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-sm text-[var(--text-muted)]">Python</span>
+                        <span class="text-sm font-mono text-[var(--text-primary)]">{systemInfo.python_version}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-sm text-[var(--text-muted)]">Boot Time</span>
+                        <span class="text-sm text-[var(--text-primary)]">{systemInfo.boot_time}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Resources */}
+                  <div class="space-y-3">
+                    <h4 class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
+                      <Activity class="w-3.5 h-3.5" />
+                      Resources
+                    </h4>
+                    <div class="space-y-2">
+                      <div class="space-y-1">
+                        <div class="flex justify-between text-sm">
+                          <span class="text-[var(--text-muted)]">CPU ({systemInfo.cpu_count} cores)</span>
+                          <span class="text-[var(--text-primary)]">{systemInfo.cpu_percent}%</span>
+                        </div>
+                        <div class="h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
+                          <div class="h-full bg-[var(--accent)] rounded-full" style={{ width: `${systemInfo.cpu_percent}%` }} />
+                        </div>
+                      </div>
+                      <div class="space-y-1">
+                        <div class="flex justify-between text-sm">
+                          <span class="text-[var(--text-muted)]">Memory</span>
+                          <span class="text-[var(--text-primary)]">{systemInfo.memory_used} / {systemInfo.memory_total} ({systemInfo.memory_percent}%)</span>
+                        </div>
+                        <div class="h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
+                          <div class="h-full bg-[var(--accent)] rounded-full" style={{ width: `${systemInfo.memory_percent}%` }} />
+                        </div>
+                      </div>
+                      <div class="space-y-1">
+                        <div class="flex justify-between text-sm">
+                          <span class="text-[var(--text-muted)]">Disk</span>
+                          <span class="text-[var(--text-primary)]">{systemInfo.disk_used} / {systemInfo.disk_total} ({systemInfo.disk_percent}%)</span>
+                        </div>
+                        <div class="h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
+                          <div class="h-full bg-[var(--accent)] rounded-full" style={{ width: `${systemInfo.disk_percent}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p class="text-sm text-[var(--text-muted)]">Failed to load system information</p>
+              )}
+            </SettingsCard>
+
+            {/* Debug Logging & Support Bundle */}
+            <SettingsCard
+              id="debug"
+              icon={Bug}
+              title="Debug Logging"
+              description="Enable verbose logging for troubleshooting"
+            >
+              <div class="space-y-5">
+                {/* Debug Toggle */}
+                <div class={`flex items-center justify-between p-4 rounded-xl border ${
+                  debugLogging?.enabled
+                    ? 'bg-amber-500/10 border-amber-500/30'
+                    : 'bg-[var(--bg-tertiary)]/50 border-[var(--border-color)]'
+                }`}>
+                  <div class="flex items-center gap-3">
+                    <div class={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      debugLogging?.enabled ? 'bg-amber-500/20' : 'bg-[var(--text-muted)]/10'
+                    }`}>
+                      <Bug class={`w-5 h-5 ${debugLogging?.enabled ? 'text-amber-500' : 'text-[var(--text-muted)]'}`} />
+                    </div>
+                    <div>
+                      <p class="text-sm font-medium text-[var(--text-primary)]">Debug Logging</p>
+                      <p class="text-xs text-[var(--text-muted)]">
+                        {debugLogging?.enabled
+                          ? 'Capturing detailed logs'
+                          : 'Normal logging level'}
+                        {debugLogging?.enabled && debugLogging.duration_seconds !== null && (
+                          <span class="text-amber-400 ml-2">
+                            ({Math.floor(debugLogging.duration_seconds / 60)}m {debugLogging.duration_seconds % 60}s)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleToggleDebugLogging}
+                    disabled={loadingDebug}
+                    class={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 ${
+                      debugLogging?.enabled
+                        ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'
+                        : 'bg-green-500 text-white hover:bg-green-600'
+                    }`}
+                  >
+                    {loadingDebug ? (
+                      <Loader2 class="w-4 h-4 animate-spin" />
+                    ) : debugLogging?.enabled ? (
+                      <>Disable</>
+                    ) : (
+                      <>Enable</>
+                    )}
+                  </button>
+                </div>
+
+                {/* Support Bundle */}
+                <div class="p-4 rounded-xl border border-[var(--border-color)]">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                      <FileText class="w-5 h-5 text-[var(--accent)]" />
+                      <div>
+                        <p class="text-sm font-medium text-[var(--text-primary)]">Support Bundle</p>
+                        <p class="text-xs text-[var(--text-muted)]">
+                          Download logs and system info for troubleshooting
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleDownloadBundle}
+                      disabled={downloadingBundle || !debugLogging?.enabled}
+                      class="btn btn-primary flex items-center gap-2"
+                      title={!debugLogging?.enabled ? 'Enable debug logging first' : undefined}
+                    >
+                      {downloadingBundle ? (
+                        <Loader2 class="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Download class="w-4 h-4" />
+                      )}
+                      Download
+                    </button>
+                  </div>
+                  {!debugLogging?.enabled && (
+                    <p class="mt-3 text-xs text-yellow-500 flex items-center gap-1.5">
+                      <AlertCircle class="w-3.5 h-3.5" />
+                      Enable debug logging above to generate support bundle
+                    </p>
+                  )}
+                </div>
+              </div>
+            </SettingsCard>
+
+            {/* Log Viewer */}
+            <SettingsCard
+              id="logs"
+              icon={FileText}
+              title="Application Logs"
+              description="View and filter application log entries"
+              headerRight={
+                <div class="flex items-center gap-2">
+                  {/* Live indicator */}
+                  {logStreaming && (
+                    <span class="flex items-center gap-1.5 px-2 py-1 bg-green-500/20 rounded text-green-500 text-xs">
+                      <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                      Live
+                    </span>
+                  )}
+                  {/* Start/Stop button */}
+                  {logStreaming ? (
+                    <button
+                      onClick={() => setLogStreaming(false)}
+                      class="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded transition-colors"
+                    >
+                      <Square class="w-4 h-4" />
+                      Stop
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setLogStreaming(true);
+                        refreshLogs();
+                      }}
+                      class="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-500/20 text-green-500 hover:bg-green-500/30 rounded transition-colors"
+                    >
+                      <Play class="w-4 h-4" />
+                      Start
+                    </button>
+                  )}
+                  {/* Clear button */}
+                  <button
+                    onClick={handleClearLogs}
+                    disabled={logs.length === 0}
+                    class="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--border-color)] rounded transition-colors disabled:opacity-50"
+                  >
+                    <Trash2 class="w-4 h-4" />
+                    Clear
+                  </button>
+                  {/* Refresh button */}
+                  <button
+                    onClick={refreshLogs}
+                    disabled={loadingLogs}
+                    class="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--border-color)] rounded transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw class={`w-4 h-4 ${loadingLogs ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+              }
+            >
+              <div class="space-y-4">
+                {/* Filters */}
+                <div class="flex flex-wrap gap-3">
+                  <select
+                    value={logLevel}
+                    onChange={(e) => setLogLevel((e.target as HTMLSelectElement).value)}
+                    class="px-3 py-2 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                  >
+                    <option value="">All Levels</option>
+                    <option value="DEBUG">DEBUG</option>
+                    <option value="INFO">INFO</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="ERROR">ERROR</option>
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Search logs..."
+                    value={logSearch}
+                    onInput={(e) => setLogSearch((e.target as HTMLInputElement).value)}
+                    class="flex-1 min-w-[200px] px-3 py-2 text-sm bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:outline-none"
+                  />
+                  <span class="text-xs text-[var(--text-muted)] self-center">
+                    {logsFiltered} of {logsTotal} entries
+                  </span>
+                </div>
+
+                {/* Log Entries */}
+                <div class="max-h-[500px] overflow-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)]">
+                  {loadingLogs && logs.length === 0 ? (
+                    <div class="flex items-center justify-center py-8">
+                      <Loader2 class="w-5 h-5 animate-spin text-[var(--text-muted)]" />
+                    </div>
+                  ) : logs.length === 0 ? (
+                    <div class="flex flex-col items-center justify-center py-8 text-[var(--text-muted)]">
+                      <FileText class="w-8 h-8 mb-2 opacity-50" />
+                      <p class="text-sm">No log entries</p>
+                      <p class="text-xs mt-1">Click Start to enable live log streaming</p>
+                    </div>
+                  ) : (
+                    <div class="divide-y divide-[var(--border-color)]">
+                      {logs.map((entry, i) => (
+                        <div key={i} class="px-3 py-2 hover:bg-[var(--bg-tertiary)]/50 transition-colors">
+                          <div class="flex items-start gap-2">
+                            <span class={`text-xs font-mono px-1.5 py-0.5 rounded flex-shrink-0 ${
+                              entry.level === 'ERROR' ? 'bg-red-500/20 text-red-500' :
+                              entry.level === 'WARNING' ? 'bg-yellow-500/20 text-yellow-500' :
+                              entry.level === 'DEBUG' ? 'bg-purple-500/20 text-purple-500' :
+                              'bg-blue-500/20 text-blue-500'
+                            }`}>
+                              {entry.level}
+                            </span>
+                            <span class="text-xs font-mono text-[var(--text-muted)] flex-shrink-0">
+                              {entry.timestamp.split(' ')[1]?.split(',')[0] || entry.timestamp}
+                            </span>
+                            <span class="text-xs text-[var(--accent)] flex-shrink-0">
+                              [{entry.logger_name}]
+                            </span>
+                          </div>
+                          <p class="text-sm text-[var(--text-primary)] mt-1 ml-0 font-mono whitespace-pre-wrap break-all">
+                            {entry.message}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer status */}
+                <div class="flex items-center justify-between text-sm text-[var(--text-muted)]">
+                  {logStreaming ? (
+                    <span class="flex items-center gap-2">
+                      <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      Auto-refreshing every 2 seconds
+                    </span>
+                  ) : (
+                    <span>Click Start to enable live log streaming</span>
+                  )}
+                </div>
+              </div>
+            </SettingsCard>
+
+            {/* Help Section */}
+            <SettingsCard
+              id="help"
+              icon={HelpCircle}
+              title="Get Help"
+              description="Resources for troubleshooting issues"
+            >
+              <div class="flex flex-wrap gap-3">
+                <a
+                  href="https://github.com/maziggy/spoolbuddy/issues"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="btn btn-ghost flex items-center gap-2"
+                >
+                  <AlertCircle class="w-4 h-4" />
+                  Report Issue
+                </a>
+                <a
+                  href="https://github.com/maziggy/spoolbuddy/wiki"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="btn btn-ghost flex items-center gap-2"
+                >
+                  <ExternalLink class="w-4 h-4" />
+                  Documentation
+                </a>
+              </div>
+            </SettingsCard>
           </div>
         )}
 

@@ -5,6 +5,7 @@ from .firmware import router as firmware_router
 from .printers import router as printers_router
 from .serial import router as serial_router
 from .spools import router as spools_router
+from .support import router as support_router
 from .tags import router as tags_router
 from .updates import router as updates_router
 
@@ -18,4 +19,5 @@ __all__ = [
     "serial_router",
     "discovery_router",
     "catalog_router",
+    "support_router",
 ]
