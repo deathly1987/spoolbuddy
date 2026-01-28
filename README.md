@@ -28,6 +28,13 @@
 
 ---
 
+> [!CAUTION]
+> **This project is under heavy development and not yet ready for end users.**
+>
+> Hardware designs, firmware, and software are actively being developed and may change significantly. Documentation may be incomplete or outdated. If you're interested in following the progress or contributing, join our [Discord](https://discord.gg/3XFdHBkF)!
+
+---
+
 ## Why SpoolBuddy?
 
 - **Know your filament** — NFC tags identify spools instantly, no more guessing
