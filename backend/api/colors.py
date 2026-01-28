@@ -281,7 +281,7 @@ async def sync_from_filamentcolors():
                 "skipped": skipped,
                 "total_fetched": total_fetched,
                 "total_available": total_available,
-                "error": str(e),
+                "error": "An unexpected error occurred during sync",
             }
             yield f"data: {json.dumps(error_result)}\n\n"
 

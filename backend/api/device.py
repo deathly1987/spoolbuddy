@@ -4,6 +4,7 @@ Handles device discovery, connection management, and emergency recovery.
 """
 
 import asyncio
+import ipaddress
 import logging
 import socket
 from datetime import datetime
@@ -12,6 +13,20 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+
+def _is_private_ip(ip: str) -> bool:
+    """Check if an IP address is private/local (not routable on public internet).
+
+    This prevents SSRF attacks by ensuring we only probe devices on local networks.
+    """
+    try:
+        addr = ipaddress.ip_address(ip)
+        return addr.is_private or addr.is_loopback or addr.is_link_local
+    except ValueError:
+        return False
+
+
 router = APIRouter(prefix="/device", tags=["device"])
 
 
@@ -296,7 +311,15 @@ async def get_recovery_info():
 
 
 async def _probe_device(ip: str, port: int) -> DeviceInfo | None:
-    """Probe a device to check if it's a SpoolBuddy device."""
+    """Probe a device to check if it's a SpoolBuddy device.
+
+    Only probes private/local IP addresses to prevent SSRF attacks.
+    """
+    # Security: Only allow probing private/local IPs
+    if not _is_private_ip(ip):
+        logger.warning(f"Refusing to probe non-private IP: {ip}")
+        return None
+
     try:
         # Try HTTP endpoint
         import httpx
