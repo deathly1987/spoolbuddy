@@ -9,10 +9,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/maziggy/SpoolStation/releases"><img src="https://img.shields.io/github/v/release/maziggy/SpoolStation?style=flat-square&color=blue" alt="Release"></a>
-  <a href="https://github.com/maziggy/SpoolStation/blob/main/LICENSE"><img src="https://img.shields.io/github/license/maziggy/SpoolStation?style=flat-square" alt="License"></a>
-  <a href="https://github.com/maziggy/SpoolStation/stargazers"><img src="https://img.shields.io/github/stars/maziggy/SpoolStation?style=flat-square" alt="Stars"></a>
-  <a href="https://github.com/maziggy/SpoolStation/issues"><img src="https://img.shields.io/github/issues/maziggy/SpoolStation?style=flat-square" alt="Issues"></a>
+  <a href="https://github.com/maziggy/spoolbuddy/releases"><img src="https://img.shields.io/github/v/release/maziggy/spoolbuddy?style=flat-square&color=blue" alt="Release"></a>
+  <a href="https://github.com/maziggy/spoolbuddy/blob/main/LICENSE"><img src="https://img.shields.io/github/license/maziggy/spoolbuddy?style=flat-square" alt="License"></a>
+  <a href="https://github.com/maziggy/spoolbuddy/stargazers"><img src="https://img.shields.io/github/stars/maziggy/spoolbuddy?style=flat-square" alt="Stars"></a>
+  <a href="https://github.com/maziggy/spoolbuddy/issues"><img src="https://img.shields.io/github/issues/maziggy/spoolbuddy?style=flat-square" alt="Issues"></a>
   <a href="https://discord.gg/aFS3ZfScHM"><img src="https://img.shields.io/discord/1461241694715645994?style=flat-square&logo=discord&logoColor=white&label=Discord&color=5865F2" alt="Discord"></a>
   <a href="https://ko-fi.com/maziggy"><img src="https://img.shields.io/badge/Ko--fi-Support-ff5e5b?style=flat-square&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
 </p>
@@ -21,6 +21,7 @@
   <a href="#-features">Features</a> •
   <a href="#-hardware">Hardware</a> •
   <a href="#-quick-start">Quick Start</a> •
+  <a href="https://wiki.spoolbuddy.cool">Documentation</a> •
   <a href="#-contributing">Contributing</a> •
   <a href="https://discord.gg/aFS3ZfScHM">Discord</a>
 </p>
@@ -43,28 +44,27 @@
 <td width="50%" valign="top">
 
 ### 📱 Hardware Device
-- ESP32-S3 based touchscreen display
-- Integrated precision scale (0.1g accuracy)
+- 7" IPS touchscreen display (800x480)
+- Integrated precision scale (5kg capacity, 0.1g accuracy)
 - NFC reader for spool identification
 - WiFi connectivity to backend server
 - Compact form factor sits under your spool
 
 ### 🏷️ NFC Tag Support
-- Read/write NFC tags on spools
+- Read NFC tags on spools
 - Multiple tag formats supported:
   - OpenSpool
   - OpenTag3D
   - SpoolEase
-  - Bambu Lab RFID
+  - Bambu Lab RFID (ISO 15693)
 - Auto-detect tag format
-- Write spool data to blank tags
+- Write spool data to NTAG tags
 
 ### ⚖️ Weight Tracking
 - Real-time weight display
 - Automatic weight updates when spool placed
 - Core weight calibration per spool type
 - Remaining filament calculation
-- History of weight changes
 
 </td>
 <td width="50%" valign="top">
@@ -98,18 +98,23 @@
 
 ## 🔧 Hardware
 
-SpoolBuddy consists of:
+SpoolBuddy requires these components (~$100-150 total):
 
 | Component | Description |
 |-----------|-------------|
-| **ESP32-S3 Display** | 4" touchscreen with WiFi |
-| **Load Cell** | HX711-based precision scale |
-| **NFC Reader** | PN532 for tag read/write |
-| **Enclosure** | 3D printed housing |
+| **Elecrow CrowPanel 7.0" Advance** | ESP32-S3 display with 800x480 IPS touchscreen |
+| **Raspberry Pi Pico** | NFC bridge controller |
+| **PN5180 NFC Reader** | ISO 15693 support for Bambu Lab tags (3.3V only!) |
+| **SparkFun Qwiic NAU7802** | 24-bit scale ADC |
+| **5kg Load Cell** | Weight sensor |
+| **22AWG Silicone Wire** | Wiring connections |
+| **M4x25 Screws** | Mounting hardware |
+
+> **Warning:** The PN5180 is 3.3V only — 5V will damage it! RC522 readers are not compatible.
 
 ### Bill of Materials
 
-*Coming soon — Hardware documentation in progress*
+See the [Hardware Required](https://wiki.spoolbuddy.cool/getting-started/hardware-required/) page for the complete BOM with purchase links.
 
 ---
 
@@ -126,8 +131,8 @@ SpoolBuddy consists of:
 
 ```bash
 # Clone repository
-git clone https://github.com/maziggy/SpoolStation.git
-cd SpoolStation
+git clone https://github.com/maziggy/spoolbuddy.git
+cd spoolbuddy
 
 # Backend setup
 cd backend
@@ -151,7 +156,23 @@ npm run dev
 
 ### Firmware
 
-See the `firmware/` directory for ESP32 firmware source code and flashing instructions.
+SpoolBuddy uses two firmware components:
+
+| Device | Format | Description |
+|--------|--------|-------------|
+| **Raspberry Pi Pico** | `.uf2` (Arduino) | NFC bridge controller |
+| **CrowPanel 7.0"** | `.bin` (Rust/ESP-IDF) | Display, scale, WiFi |
+
+**Quick flash (pre-built):**
+```bash
+# Pico: Hold BOOTSEL, plug USB, drag pico-nfc-bridge.uf2 to RPI-RP2 drive
+
+# CrowPanel:
+cargo install espflash
+espflash flash --monitor spoolbuddy-firmware.bin
+```
+
+See the [Firmware Guide](https://wiki.spoolbuddy.cool/getting-started/firmware/) for detailed instructions.
 
 ---
 
@@ -161,7 +182,8 @@ See the `firmware/` directory for ESP32 firmware source code and flashing instru
 |-----------|------------|
 | Backend | Python, FastAPI, SQLite |
 | Frontend | Preact, TypeScript, Tailwind CSS |
-| Firmware | Rust, ESP-IDF, LVGL |
+| Display Firmware | Rust, ESP-IDF, LVGL |
+| NFC Bridge | Arduino (Pico) |
 | Communication | MQTT (TLS), WebSocket, REST |
 
 ---
@@ -177,6 +199,17 @@ See the `firmware/` directory for ESP32 firmware source code and flashing instru
 
 ---
 
+## 📚 Documentation
+
+Full documentation available at **[wiki.spoolbuddy.cool](https://wiki.spoolbuddy.cool)**:
+
+- [Getting Started](https://wiki.spoolbuddy.cool/getting-started/) — Hardware setup and installation
+- [Hardware Required](https://wiki.spoolbuddy.cool/getting-started/hardware-required/) — Bill of materials
+- [Firmware](https://wiki.spoolbuddy.cool/getting-started/firmware/) — Flashing instructions
+- [Software](https://wiki.spoolbuddy.cool/getting-started/software/) — Backend setup
+
+---
+
 ## 🤝 Contributing
 
 Contributions welcome! Here's how to help:
@@ -188,8 +221,8 @@ Contributions welcome! Here's how to help:
 
 ```bash
 # Development setup
-git clone https://github.com/maziggy/SpoolStation.git
-cd SpoolStation
+git clone https://github.com/maziggy/spoolbuddy.git
+cd spoolbuddy
 
 # Backend
 cd backend
@@ -221,10 +254,15 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
+If you like SpoolBuddy and want to support it, you can <a href="https://ko-fi.com/maziggy" target=_blank>buy Martin a coffee</a>.
+
+---
+
 <p align="center">
   Made with ❤️ for the 3D printing community
   <br><br>
   <a href="https://discord.gg/aFS3ZfScHM">Join our Discord</a> •
-  <a href="https://github.com/maziggy/SpoolStation/issues">Report Bug</a> •
-  <a href="https://github.com/maziggy/SpoolStation/issues">Request Feature</a>
+  <a href="https://github.com/maziggy/spoolbuddy/issues">Report Bug</a> •
+  <a href="https://github.com/maziggy/spoolbuddy/issues">Request Feature</a> •
+  <a href="https://wiki.spoolbuddy.cool">Documentation</a>
 </p>

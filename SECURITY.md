@@ -10,7 +10,7 @@ The SpoolBuddy team takes security seriously. We appreciate your efforts to resp
 
 Instead, please use GitHub's private vulnerability reporting feature:
 
-1. Go to the [Security tab](https://github.com/maziggy/SpoolStation/security)
+1. Go to the [Security tab](https://github.com/maziggy/spoolbuddy/security)
 2. Click "Report a vulnerability"
 3. Fill out the form with details
 
