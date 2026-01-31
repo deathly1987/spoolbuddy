@@ -47,6 +47,7 @@ const defaultColumns: ColumnConfig[] = [
   // Extra visual columns
   { id: 'remaining', label: 'Remaining', visible: true },
   { id: 'scale', label: 'Scale', visible: false },
+  { id: 'assigned_to', label: 'Assigned To', visible: true },
 ]
 
 export function getDefaultColumns(): ColumnConfig[] {

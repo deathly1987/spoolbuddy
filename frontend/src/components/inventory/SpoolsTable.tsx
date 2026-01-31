@@ -11,7 +11,7 @@ import {
   ColumnFiltersState,
   ColumnDef,
 } from '@tanstack/react-table'
-import { Spool, SpoolsInPrinters } from '../../lib/api'
+import { Spool, SpoolsInPrinters, SlotAssignment } from '../../lib/api'
 import { SpoolCard } from './SpoolCard'
 import { WeightProgress } from './ProgressBar'
 import { PrinterBadge, KBadge, OriginBadge } from './Badge'
@@ -94,6 +94,7 @@ function getStoredSorting(): SortingState {
 interface SpoolsTableProps {
   spools: Spool[]
   spoolsInPrinters?: SpoolsInPrinters
+  slotAssignments?: Record<string, SlotAssignment[]>
   onEditSpool?: (spool: Spool) => void
   onSyncWeight?: (spool: Spool) => void
   columnConfig?: ColumnConfig[]
@@ -104,6 +105,7 @@ interface SpoolsTableProps {
 export function SpoolsTable({
   spools,
   spoolsInPrinters = {},
+  slotAssignments = {},
   onEditSpool,
   onSyncWeight,
   columnConfig,
@@ -429,8 +431,37 @@ export function SpoolsTable({
         },
         size: 100,
       }),
+      // Assigned To
+      columnHelper.accessor((row) => {
+        // Find if this spool is assigned to any slot
+        for (const assignments of Object.values(slotAssignments)) {
+          const assignment = assignments.find(a => a.spool_id === row.id)
+          if (assignment) {
+            return assignment
+          }
+        }
+        return null
+      }, {
+        id: 'assigned_to',
+        header: 'Assigned To',
+        cell: (info) => {
+          const assignment = info.getValue()
+          if (!assignment) {
+            return <span class="text-[var(--text-muted)]">-</span>
+          }
+          return (
+            <div class="flex flex-col">
+              <span class="text-sm font-medium">AMS {assignment.ams_id} Slot {assignment.tray_id}</span>
+              {assignment.color_name && (
+                <span class="text-xs text-[var(--text-muted)]">{assignment.color_name}</span>
+              )}
+            </div>
+          )
+        },
+        size: 140,
+      }),
     ],
-    [spoolsInPrinters, onSyncWeight]
+    [spoolsInPrinters, onSyncWeight, slotAssignments]
   )
 
   // Apply column configuration (visibility and order)

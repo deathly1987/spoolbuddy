@@ -106,6 +106,19 @@ export interface AssignSpoolResponse {
   needs_replacement: boolean;
 }
 
+export interface SlotAssignment {
+  id: number;
+  spool_id: string;
+  printer_serial: string;
+  ams_id: number;
+  tray_id: number;
+  assigned_at: number;
+  material?: string;
+  color_name?: string;
+  rgba?: string;
+  brand?: string;
+}
+
 export interface CalibrationProfile {
   cali_idx: number;
   filament_id: string;
@@ -620,6 +633,10 @@ class ApiClient {
         body: JSON.stringify({ spool_id: spoolId }),
       }
     );
+  }
+
+  async getSlotAssignments(serial: string): Promise<SlotAssignment[]> {
+    return this.request<SlotAssignment[]>(`/printers/${serial}/assignments`);
   }
 
   // Device

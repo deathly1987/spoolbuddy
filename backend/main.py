@@ -381,7 +381,7 @@ async def broadcast_message(message: dict):
     text = json.dumps(message)
     disconnected = set()
 
-    for ws in websocket_clients:
+    for     http://172.16.15.7:8000/api/printersws in websocket_clients:
         try:
             await ws.send_text(text)
         except Exception:

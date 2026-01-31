@@ -81,10 +81,12 @@ class UsageTracker:
             for tray in ams_unit.trays:
                 if tray.remain is not None:
                     tray_remain[(ams_unit.id, tray.tray_id)] = tray.remain
+                    logger.debug(f"[{serial}] Captured tray start: AMS {ams_unit.id}, tray {tray.tray_id}, remain={tray.remain}%")
 
         # Also capture virtual tray if present
         if state.vt_tray and state.vt_tray.remain is not None:
             tray_remain[(255, 0)] = state.vt_tray.remain
+            logger.debug(f"[{serial}] Captured virtual tray start: remain={state.vt_tray.remain}%")
 
         session = PrintSession(
             printer_serial=serial,
@@ -95,7 +97,9 @@ class UsageTracker:
         )
         self._sessions[serial] = session
 
-        logger.info(f"Print started on {serial}: '{print_name}', tracking {len(tray_remain)} tray(s)")
+        logger.info(f"Print started on {serial}: '{print_name}', tracking {len(tray_remain)} tray(s) with remain values")
+        if not tray_remain:
+            logger.warning(f"[{serial}] Print started but no tray remain data captured! ams_units={len(state.ams_units)}, vt_tray={state.vt_tray is not None}")
 
     def _on_print_end(self, serial: str, state: PrinterState, success: bool):
         """Handle print end."""
@@ -113,9 +117,11 @@ class UsageTracker:
             for tray in ams_unit.trays:
                 if tray.remain is not None:
                     current_remain[(ams_unit.id, tray.tray_id)] = tray.remain
+                    logger.debug(f"[{serial}] Captured tray end: AMS {ams_unit.id}, tray {tray.tray_id}, remain={tray.remain}%")
 
         if state.vt_tray and state.vt_tray.remain is not None:
             current_remain[(255, 0)] = state.vt_tray.remain
+            logger.debug(f"[{serial}] Captured virtual tray end: remain={state.vt_tray.remain}%")
 
         # Calculate delta for each tray
         for key, start_remain in session.tray_remain_start.items():
@@ -124,9 +130,15 @@ class UsageTracker:
                 used_percent = start_remain - end_remain
                 if used_percent > 0:
                     tray_usage[key] = used_percent
+                    logger.debug(f"[{serial}] Tray {key}: {start_remain}% -> {end_remain}% (used {used_percent}%)")
+            else:
+                if key not in current_remain:
+                    logger.warning(f"[{serial}] Tray {key} was tracked at start ({start_remain}%) but not found at end (ams_units={len(state.ams_units)})")
 
         status = "completed" if success else "failed"
         logger.info(f"Print {status} on {serial}: '{session.print_name}', usage: {tray_usage}")
+        if not tray_usage and session.tray_remain_start:
+            logger.warning(f"[{serial}] Print ended but usage is empty! Started with {len(session.tray_remain_start)} tray(s), ended with {len(current_remain)} tray(s)")
 
         # Notify callback if usage detected
         if tray_usage and self._on_usage_logged:

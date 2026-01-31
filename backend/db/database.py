@@ -85,7 +85,8 @@ CREATE TABLE IF NOT EXISTS spool_assignments (
     ams_id INTEGER NOT NULL,
     tray_id INTEGER NOT NULL,
     assigned_at INTEGER DEFAULT (strftime('%s', 'now')),
-    UNIQUE(printer_serial, ams_id, tray_id)
+    UNIQUE(printer_serial, ams_id, tray_id),
+    UNIQUE(printer_serial, spool_id)
 );
 
 -- Settings table (key-value store for app settings)
@@ -746,18 +747,35 @@ class Database:
     # ============ Spool Assignment Operations ============
 
     async def assign_spool_to_slot(self, spool_id: str, printer_serial: str, ams_id: int, tray_id: int) -> bool:
-        """Assign a spool to an AMS slot (upsert)."""
+        """Assign a spool to an AMS slot (upsert).
+        
+        If the spool is already assigned to a different slot on the same printer,
+        the old assignment will be deleted and replaced with this new one.
+        """
         now = int(time.time())
-        await self.conn.execute(
-            """INSERT INTO spool_assignments (spool_id, printer_serial, ams_id, tray_id, assigned_at)
-               VALUES (?, ?, ?, ?, ?)
-               ON CONFLICT(printer_serial, ams_id, tray_id) DO UPDATE SET
-               spool_id = excluded.spool_id,
-               assigned_at = excluded.assigned_at""",
-            (spool_id, printer_serial, ams_id, tray_id, now),
-        )
-        await self.conn.commit()
-        return True
+        try:
+            # First, delete any existing assignment of this spool on this printer
+            await self.conn.execute(
+                "DELETE FROM spool_assignments WHERE printer_serial = ? AND spool_id = ?",
+                (printer_serial, spool_id),
+            )
+            
+            # Now insert the new assignment
+            cursor = await self.conn.execute(
+                """INSERT INTO spool_assignments (spool_id, printer_serial, ams_id, tray_id, assigned_at)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (spool_id, printer_serial, ams_id, tray_id, now),
+            )
+            await self.conn.commit()
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"DB: Saved assignment - spool {spool_id} to {printer_serial} AMS {ams_id} tray {tray_id}")
+            return True
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"DB: Failed to save assignment: {e}")
+            return False
 
     async def unassign_slot(self, printer_serial: str, ams_id: int, tray_id: int) -> bool:
         """Remove spool assignment from a slot."""
@@ -779,6 +797,10 @@ class Database:
 
     async def get_slot_assignments(self, printer_serial: str) -> list[dict]:
         """Get all spool assignments for a printer."""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"DB: Getting assignments for printer {printer_serial}")
+        
         async with self.conn.execute(
             """SELECT sa.*, s.material, s.color_name, s.rgba, s.brand
                FROM spool_assignments sa
@@ -787,7 +809,9 @@ class Database:
             (printer_serial,),
         ) as cursor:
             rows = await cursor.fetchall()
-            return [dict(row) for row in rows]
+            result = [dict(row) for row in rows]
+            logger.info(f"DB: Found {len(result)} assignments for {printer_serial}")
+            return result
 
     # ============ Usage History Operations ============
 

@@ -5,6 +5,7 @@ import { useWebSocket } from "../lib/websocket";
 import { useToast } from "../lib/toast";
 import { Cloud, CloudOff, X, Download, Check, AlertTriangle, RefreshCw } from "lucide-preact";
 import { SpoolIcon } from "../components/AmsCard";
+import { AmsAssignmentsCard } from "../components/AmsAssignmentsCard";
 import { AssignAmsModal } from "../components/AssignAmsModal";
 import { LinkSpoolModal } from "../components/LinkSpoolModal";
 
@@ -833,6 +834,9 @@ export function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* AMS Assignments Card */}
+      <AmsAssignmentsCard printers={printers} />
 
       {/* Assign to AMS Modal */}
       {assignModalSpool && (

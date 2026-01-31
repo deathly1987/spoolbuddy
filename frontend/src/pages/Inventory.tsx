@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "preact/hooks";
-import { api, Spool, SpoolInput, SpoolsInPrinters } from "../lib/api";
+import { api, Spool, SpoolInput, SpoolsInPrinters, SlotAssignment } from "../lib/api";
 import {
   SpoolsTable,
   StatsBar,
@@ -10,6 +10,7 @@ import {
   ColumnConfig,
   PrinterWithCalibrations,
 } from "../components/inventory";
+import { AssignAmsModal } from "../components/AssignAmsModal";
 import { Plus } from "lucide-preact";
 import { useToast } from "../lib/toast";
 import { useWebSocket } from "../lib/websocket";
@@ -51,6 +52,7 @@ function saveColumnConfig(config: ColumnConfig[]) {
 export function Inventory() {
   const [spools, setSpools] = useState<Spool[]>([]);
   const [spoolsInPrinters] = useState<SpoolsInPrinters>({}); // TODO: Get from printer state
+  const [slotAssignments, setSlotAssignments] = useState<Record<string, SlotAssignment[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
@@ -66,6 +68,8 @@ export function Inventory() {
   const [editSpool, setEditSpool] = useState<Spool | null>(null);
   const [deleteSpool, setDeleteSpool] = useState<Spool | null>(null);
   const [showColumnModal, setShowColumnModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assignModalSpool, setAssignModalSpool] = useState<Spool | null>(null);
 
   // Handle URL query parameters (edit, add, tagId, weight)
   useEffect(() => {
@@ -112,7 +116,9 @@ export function Inventory() {
   const loadPrintersAndCalibrations = useCallback(async () => {
     try {
       const printers = await api.listPrinters();
+      console.log('Loading printers and assignments:', printers.map(p => p.serial));
       const printersData: PrinterWithCalibrations[] = [];
+      const assignmentsMap: Record<string, SlotAssignment[]> = {};
 
       for (const printer of printers) {
         // Only fetch calibrations for connected printers
@@ -124,13 +130,25 @@ export function Inventory() {
             // If calibrations fail, include printer with empty calibrations
             printersData.push({ printer, calibrations: [] });
           }
+
+          // Load slot assignments for this printer
+          try {
+            const assignments = await api.getSlotAssignments(printer.serial);
+            assignmentsMap[printer.serial] = assignments;
+          } catch (e) {
+            // If assignments fail, use empty list
+            assignmentsMap[printer.serial] = [];
+          }
         } else {
           // Printer not connected - include with empty calibrations
           printersData.push({ printer, calibrations: [] });
+          assignmentsMap[printer.serial] = [];
         }
       }
 
       setPrintersWithCalibrations(printersData);
+      setSlotAssignments(assignmentsMap);
+      console.log('Final loaded slotAssignments:', assignmentsMap);
     } catch (e) {
       console.error("Failed to load printers:", e);
     }
@@ -201,6 +219,26 @@ export function Inventory() {
     saveColumnConfig(config);
   };
 
+  const reloadAssignments = useCallback(async () => {
+    try {
+      const printers = await api.listPrinters();
+      const assignmentsMap: Record<string, SlotAssignment[]> = {};
+
+      for (const printer of printers) {
+        try {
+          const assignments = await api.getSlotAssignments(printer.serial);
+          assignmentsMap[printer.serial] = assignments;
+        } catch (e) {
+          assignmentsMap[printer.serial] = [];
+        }
+      }
+
+      setSlotAssignments(assignmentsMap);
+    } catch (e) {
+      console.error("Failed to reload assignments:", e);
+    }
+  }, []);
+
   const handleSyncWeight = async (spool: Spool) => {
     if (spool.weight_current === null) return;
     try {
@@ -249,6 +287,7 @@ export function Inventory() {
         <SpoolsTable
           spools={spools}
           spoolsInPrinters={spoolsInPrinters}
+          slotAssignments={slotAssignments}
           columnConfig={columnConfig}
           onEditSpool={(spool) => setEditSpool(spool)}
           onSyncWeight={handleSyncWeight}
@@ -281,6 +320,11 @@ export function Inventory() {
         onArchive={handleArchiveSpool}
         onRestore={handleRestoreSpool}
         onTagRemoved={loadSpools}
+        onConfigureAms={(spool) => {
+          setAssignModalSpool(spool);
+          setShowAssignModal(true);
+          setEditSpool(null);
+        }}
         printersWithCalibrations={printersWithCalibrations}
       />
 
@@ -291,6 +335,20 @@ export function Inventory() {
         spool={deleteSpool}
         onDelete={handleDeleteSpool}
       />
+
+      {/* Assign to AMS Modal */}
+      {assignModalSpool && (
+        <AssignAmsModal
+          isOpen={showAssignModal}
+          onClose={() => {
+            setShowAssignModal(false);
+            setAssignModalSpool(null);
+            // Reload assignments after modal closes (to show the newly assigned spool)
+            reloadAssignments();
+          }}
+          spool={assignModalSpool}
+        />
+      )}
 
       {/* Column Configuration Modal */}
       <ColumnConfigModal

@@ -483,82 +483,27 @@ async def assign_spool_to_tray(serial: str, ams_id: int, tray_id: int, request: 
                         break
 
     if tray_has_spool and tray_matches_spool:
-        # Try immediate configuration
-        success = _printer_manager.set_filament(
-            serial=serial,
-            ams_id=ams_id,
-            tray_id=tray_id,
-            tray_info_idx=tray_info_idx,
-            setting_id=setting_id,
-            tray_type=spool.material or "",
-            tray_color=tray_color,
-            nozzle_temp_min=temp_min,
-            nozzle_temp_max=temp_max,
+        # Just record the assignment in the database
+        # Don't modify the printer - it has its own RFID data that should stay intact
+        await db.assign_spool_to_slot(request.spool_id, serial, ams_id, tray_id)
+        logger.info(
+            f"✓ Assigned spool {spool.id} ({spool.material}) to {serial} AMS {ams_id} tray {tray_id} in inventory (CONFIGURED)"
         )
-
-        # Also send extrusion_cali_sel to set K-profile (like SpoolEase does)
-        _printer_manager.set_calibration(
-            serial=serial,
-            ams_id=ams_id,
-            tray_id=tray_id,
-            cali_idx=matching_cali_idx,
-            filament_id=tray_info_idx,
-            nozzle_diameter=nozzle_diameter,
-        )
-
-        if success:
-            # Persist assignment for usage tracking
-            await db.assign_spool_to_slot(request.spool_id, serial, ams_id, tray_id)
-            logger.info(f"Assigned spool {spool.id} ({spool.material}) to {serial} AMS {ams_id} tray {tray_id}")
-            return AssignResponse(status="configured", message="Slot configured successfully")
-        else:
-            raise HTTPException(status_code=500, detail="Failed to configure slot")
+        return AssignResponse(status="configured", message="Spool assignment recorded in inventory")
     else:
-        # Send configuration immediately (non-Bambu spools have no RFID for AMS detection)
-        _printer_manager.set_filament(
-            serial=serial,
-            ams_id=ams_id,
-            tray_id=tray_id,
-            tray_info_idx=tray_info_idx,
-            setting_id=setting_id,
-            tray_type=spool.material or "",
-            tray_color=tray_color,
-            nozzle_temp_min=temp_min,
-            nozzle_temp_max=temp_max,
+        # Slot is empty or has wrong spool - just stage the assignment in the database
+        # The actual printer configuration will happen when the user physically loads the correct spool
+        await db.assign_spool_to_slot(request.spool_id, serial, ams_id, tray_id)
+        logger.info(
+            f"✓ Assigned spool {spool.id} ({spool.material}) to {serial} AMS {ams_id} tray {tray_id} in inventory (STAGED)"
         )
-
-        # Also send extrusion_cali_sel to set K-profile (like SpoolEase does)
-        _printer_manager.set_calibration(
-            serial=serial,
-            ams_id=ams_id,
-            tray_id=tray_id,
-            cali_idx=matching_cali_idx,
-            filament_id=tray_info_idx,
-            nozzle_diameter=nozzle_diameter,
-        )
-
-        # Also stage so UI flow continues as expected
-        _printer_manager.stage_assignment(
-            serial=serial,
-            ams_id=ams_id,
-            tray_id=tray_id,
-            spool_id=request.spool_id,
-            tray_info_idx=tray_info_idx,
-            setting_id=setting_id,
-            tray_type=spool.material or "",
-            tray_color=tray_color,
-            nozzle_temp_min=temp_min,
-            nozzle_temp_max=temp_max,
-            cali_idx=matching_cali_idx,
-            nozzle_diameter=nozzle_diameter,
-        )
-
+        
         # Determine message based on whether slot has wrong spool or is empty
         needs_replacement = tray_has_spool and not tray_matches_spool
         if needs_replacement:
-            message = "Replace spool to configure slot"
+            message = "Replace spool to use this assignment"
         else:
-            message = "Insert spool to configure slot"
+            message = "Insert spool to use this assignment"
 
         return AssignResponse(status="staged", message=message, needs_replacement=needs_replacement)
 
@@ -599,7 +544,12 @@ async def get_slot_assignments(serial: str):
     Returns list of assignments with spool info.
     """
     db = await get_db()
-    return await db.get_slot_assignments(serial)
+    assignments = await db.get_slot_assignments(serial)
+    logger.info(f"Getting slot assignments for {serial}: found {len(assignments)} assignments")
+    if assignments:
+        for a in assignments:
+            logger.info(f"  - Spool {a.get('spool_id')} -> AMS {a.get('ams_id')} Slot {a.get('tray_id')}")
+    return assignments
 
 
 @router.get("/{serial}/pending-assignments")

@@ -796,6 +796,16 @@ class PrinterConnection:
             self._handle_calibration_response(print_data)
             return
 
+        # Handle ams_filament_setting response - update tray data from response
+        if command == "ams_filament_setting":
+            logger.info(f"[{self.serial}] ams_filament_setting response detected, result={print_data.get('result')}")
+            if print_data.get("result") == "success":
+                logger.info(f"[{self.serial}] Calling _handle_ams_filament_setting_response")
+                self._handle_ams_filament_setting_response(print_data)
+            else:
+                logger.warning(f"[{self.serial}] ams_filament_setting failed: {print_data.get('result')}")
+            # Don't return - continue processing normal state updates
+
         # Extract nozzle diameter (single-nozzle printers)
         if "nozzle_diameter" in print_data:
             self._nozzle_diameters[0] = str(print_data["nozzle_diameter"])
@@ -986,6 +996,74 @@ class PrinterConnection:
                 self._loop.call_soon_threadsafe(self._pending_kprofile_response.set)
             else:
                 self._pending_kprofile_response.set()
+
+    def _handle_ams_filament_setting_response(self, response_data: dict):
+        """Handle successful ams_filament_setting command response.
+        
+        After setting filament on a tray, update the tray data in state
+        so the UI reflects the changes even before RFID is read.
+        """
+        try:
+            ams_id = response_data.get("ams_id")
+            tray_id = response_data.get("tray_id")
+            
+            if ams_id is None or tray_id is None:
+                logger.debug(f"[{self.serial}] ams_filament_setting response missing ams_id or tray_id")
+                return
+            
+            logger.info(f"[{self.serial}] Handling ams_filament_setting response for AMS {ams_id}, tray {tray_id}")
+            
+            # Find existing AMS unit
+            ams_unit = None
+            for unit in self._state.ams_units:
+                if unit.id == ams_id:
+                    ams_unit = unit
+                    break
+            
+            if not ams_unit:
+                logger.debug(f"[{self.serial}] AMS {ams_id} not found in state")
+                return
+            
+            # Find existing tray
+            tray_idx = None
+            for idx, t in enumerate(ams_unit.trays):
+                if t.tray_id == tray_id:
+                    tray_idx = idx
+                    break
+            
+            if tray_idx is None:
+                logger.debug(f"[{self.serial}] Tray {tray_id} not found in AMS {ams_id}")
+                return
+            
+            # Update tray with response data - preserve RFID data (remain, k_value)
+            old_tray = ams_unit.trays[tray_idx]
+            updated_tray = AmsTray(
+                ams_id=ams_id,
+                tray_id=tray_id,
+                tray_type=response_data.get("tray_type", old_tray.tray_type),
+                tray_sub_brands=response_data.get("tray_sub_brands", old_tray.tray_sub_brands),
+                tray_color=response_data.get("tray_color", old_tray.tray_color),
+                tray_info_idx=response_data.get("tray_info_idx", old_tray.tray_info_idx),
+                k_value=old_tray.k_value,  # Keep existing k_value from RFID
+                nozzle_temp_min=self._safe_int(response_data.get("nozzle_temp_min")) or old_tray.nozzle_temp_min,
+                nozzle_temp_max=self._safe_int(response_data.get("nozzle_temp_max")) or old_tray.nozzle_temp_max,
+                remain=old_tray.remain,  # Keep existing remain value from RFID
+            )
+            ams_unit.trays[tray_idx] = updated_tray
+            
+            logger.info(
+                f"[{self.serial}] Updated tray ({ams_id}, {tray_id}): "
+                f"type={updated_tray.tray_type}, color={updated_tray.tray_color}, "
+                f"remain={updated_tray.remain}%"
+            )
+            
+            # Request full state refresh to ensure printer sends updated AMS data
+            # This is critical so the UI and usage tracker can see the assigned filament
+            logger.info(f"[{self.serial}] Requesting state refresh after ams_filament_setting")
+            self._send_pushall()
+            
+        except Exception as e:
+            logger.error(f"[{self.serial}] Error handling ams_filament_setting response: {e}", exc_info=True)
 
     def _parse_ams_data(self, ams_data: dict):
         """Parse AMS units and trays from MQTT data."""

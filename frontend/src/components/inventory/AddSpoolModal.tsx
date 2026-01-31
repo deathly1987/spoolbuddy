@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks'
 import { Modal } from './Modal'
 import { Spool, SpoolInput, SlicerPreset, SpoolKProfile, CatalogEntry, api } from '../../lib/api'
-import { X, MoreHorizontal, Trash2, Unlink, Archive, ArchiveRestore } from 'lucide-preact'
+import { X, MoreHorizontal, Trash2, Unlink, Archive, ArchiveRestore, Settings } from 'lucide-preact'
 import { useToast } from '../../lib/toast'
 import {
   // Types
@@ -36,6 +36,7 @@ interface AddSpoolModalProps {
   onArchive?: (spool: Spool) => void
   onRestore?: (spool: Spool) => void
   onTagRemoved?: () => void
+  onConfigureAms?: (spool: Spool) => void
   printersWithCalibrations?: PrinterWithCalibrations[]
   initialTagId?: string | null
   initialWeight?: number | null
@@ -50,6 +51,7 @@ export function AddSpoolModal({
   onArchive,
   onRestore,
   onTagRemoved,
+  onConfigureAms,
   printersWithCalibrations = [],
   initialTagId,
   initialWeight,
@@ -380,6 +382,19 @@ export function AddSpoolModal({
                 </button>
                 {showActionsMenu && (
                   <div class="actions-dropdown-menu">
+                    {onConfigureAms && editSpool && !editSpool.archived_at && (
+                      <button
+                        type="button"
+                        class="actions-dropdown-item"
+                        onClick={() => {
+                          setShowActionsMenu(false)
+                          onConfigureAms(editSpool)
+                        }}
+                      >
+                        <Settings class="w-4 h-4" />
+                        Configure AMS
+                      </button>
+                    )}
                     {editSpool?.tag_id && (
                       <button
                         type="button"
